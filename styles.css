@@ -1473,11 +1473,128 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .interval-field select {
-    padding: 8px 10px;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    font-size: 14px;
     background: var(--card-bg);
     color: var(--text-primary);
     min-width: 140px;
+}
+
+/* ============= MOBILE RESPONSIVE ============= */
+@media (max-width: 768px) {
+    .app-container {
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    .sidebar {
+        width: 100%;
+        height: auto;
+        background: transparent;
+        padding: 0;
+        display: contents; /* Allows children to be positioned freely */
+    }
+
+    /* Top Header */
+    .sidebar-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+        padding: 0 16px;
+        background: var(--bg-sidebar);
+        flex-direction: row;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--border-color);
+        margin: 0;
+        z-index: 100;
+        padding-top: env(safe-area-inset-top);
+        height: calc(60px + env(safe-area-inset-top));
+    }
+
+    .app-logo { margin: 0; }
+    .app-name { font-size: 18px; }
+    .logo-icon { font-size: 24px; }
+    .coin-display { padding: 6px 12px; }
+    .coin-amount { font-size: 16px; }
+
+    /* Bottom Navigation */
+    .nav-tabs {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+        background: var(--card-bg);
+        flex-direction: row;
+        justify-content: space-around;
+        align-items: center;
+        border-top: 1px solid var(--border-color);
+        padding-bottom: env(safe-area-inset-bottom);
+        height: calc(60px + env(safe-area-inset-bottom));
+        z-index: 100;
+        box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+        gap: 0;
+    }
+
+    .nav-tab {
+        flex-direction: column;
+        gap: 2px;
+        padding: 8px 4px;
+        font-size: 10px;
+        flex: 1;
+        justify-content: center;
+        border-radius: 0;
+        height: 100%;
+    }
+
+    .nav-tab.active {
+        background: transparent;
+        color: var(--accent-warm);
+    }
+    
+    .nav-tab:hover { background: transparent; }
+
+    .tab-icon { font-size: 20px; margin-bottom: 2px; }
+    .tab-label { font-size: 10px; }
+
+    /* Main Content Area */
+    .main-content {
+        margin-top: calc(60px + env(safe-area-inset-top));
+        margin-bottom: calc(60px + env(safe-area-inset-bottom));
+        padding: 16px;
+        height: auto;
+        flex: 1;
+        overflow-y: auto;
+    }
+    
+    .sync-status { display: none !important; }
+
+    .sidebar-footer {
+        display: none; /* Hide streak/import on mobile footer */
+    }
+
+    /* Force 16px font size on inputs to prevent zoom */
+    input, select, textarea {
+        font-size: 16px !important;
+    }
+    
+    /* Adjust Modals */
+    .modal-content {
+        width: 92%;
+        max-height: 85vh;
+        margin: 0 auto;
+    }
+    
+    .stats-cards {
+        grid-template-columns: 1fr;
+    }
+    
+    .difficulty-breakdown, .streak-card, .rewards-claimed-card {
+        padding: 16px;
+    }
+    
+    .cost-presets {
+        grid-template-columns: repeat(4, 1fr);
+    }
 }
