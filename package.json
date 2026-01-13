@@ -1,0 +1,39 @@
+{
+    "name": "brownbook",
+    "version": "1.0.0",
+    "description": "A gamified task app with real-world rewards",
+    "main": "main.js",
+    "scripts": {
+        "start": "electron .",
+        "build": "electron-builder --mac",
+        "pack": "electron-builder --dir"
+    },
+    "author": "BrownBook",
+    "license": "MIT",
+    "devDependencies": {
+        "electron": "^28.0.0",
+        "electron-builder": "^24.9.1"
+    },
+    "build": {
+        "appId": "com.brownbook.app",
+        "productName": "BrownBook",
+        "mac": {
+            "category": "public.app-category.productivity",
+            "icon": "assets/icon.icns",
+            "target": [
+                "dir"
+            ]
+        },
+        "directories": {
+            "output": "dist"
+        },
+        "files": [
+            "main.js",
+            "preload.js",
+            "index.html",
+            "styles.css",
+            "app.js",
+            "assets/**/*"
+        ]
+    }
+}

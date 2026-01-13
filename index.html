@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+    <title>BrownBook</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="app-logo">
+                    <span class="logo-icon">📕</span>
+                    <span class="app-name">BrownBook</span>
+                </div>
+                <div class="coin-display" id="coinBalance">
+                    <span class="coin-icon">$</span>
+                    <span class="coin-amount">0</span>
+                </div>
+            </div>
+
+            <nav class="nav-tabs">
+                <button class="nav-tab active" data-tab="tasks">
+                    <span class="tab-icon">✓</span>
+                    <span class="tab-label">Tasks</span>
+                </button>
+                <button class="nav-tab" data-tab="rewards">
+                    <span class="tab-icon">🎁</span>
+                    <span class="tab-label">Rewards</span>
+                </button>
+                <button class="nav-tab" data-tab="stats">
+                    <span class="tab-icon">📊</span>
+                    <span class="tab-label">Stats</span>
+                </button>
+                <button class="nav-tab" data-tab="history">
+                    <span class="tab-icon">📜</span>
+                    <span class="tab-label">History</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="streak-display" id="streakDisplay">
+                    <span class="streak-icon">🔥</span>
+                    <span class="streak-text">0 day streak</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Tasks View -->
+            <div class="view active" id="tasksView">
+                <header class="view-header">
+                    <div class="header-info">
+                        <h1>Your Tasks</h1>
+                        <p class="subtitle" id="taskCount">0 tasks remaining</p>
+                    </div>
+                    <button class="btn btn-primary" id="addTaskBtn">
+                        <span>+</span> Add Task
+                    </button>
+                </header>
+
+                <div class="task-lists" id="taskLists">
+                    <div class="empty-state" id="tasksEmpty">
+                        <span class="empty-icon">✓</span>
+                        <h3>No tasks yet</h3>
+                        <p>Add a task to start earning coins!</p>
+                    </div>
+
+                    <section class="task-section" id="recurringTasks" style="display: none;">
+                        <h2 class="section-title">🔄 RECURRING</h2>
+                        <div class="task-list" id="recurringTaskList"></div>
+                    </section>
+
+                    <section class="task-section" id="activeTasks" style="display: none;">
+                        <h2 class="section-title">TO DO</h2>
+                        <div class="task-list" id="activeTaskList"></div>
+                    </section>
+
+                    <section class="task-section" id="todayCompletedTasks" style="display: none;">
+                        <h2 class="section-title completed-header">✅ TODAY'S COMPLETED</h2>
+                        <div class="task-list" id="todayCompletedTaskList"></div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Rewards View -->
+            <div class="view" id="rewardsView">
+                <header class="view-header">
+                    <div class="header-info">
+                        <h1>Reward Shop</h1>
+                        <p class="subtitle">Treat yourself when you've earned it</p>
+                    </div>
+                    <button class="btn btn-primary" id="addRewardBtn">
+                        <span>+</span> Add Reward
+                    </button>
+                </header>
+
+                <div class="rewards-grid" id="rewardsGrid">
+                    <!-- Shop and custom rewards rendered by JS -->
+                </div>
+            </div>
+
+            <!-- Stats View -->
+            <div class="view" id="statsView">
+                <header class="view-header">
+                    <div class="header-info">
+                        <h1>Your Progress</h1>
+                        <p class="subtitle">See how far you've come</p>
+                    </div>
+                </header>
+
+                <div class="stats-content">
+                    <div class="stats-cards">
+                        <div class="stat-card">
+                            <span class="stat-icon gold">💰</span>
+                            <span class="stat-value" id="statTotalEarned">0</span>
+                            <span class="stat-label">coins lifetime</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-icon warm">💳</span>
+                            <span class="stat-value" id="statBalance">0</span>
+                            <span class="stat-label">coins available</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-icon green">✅</span>
+                            <span class="stat-value" id="statTasksDone">0</span>
+                            <span class="stat-label">tasks completed</span>
+                        </div>
+                    </div>
+
+                    <div class="streak-card">
+                        <div class="streak-main">
+                            <span class="streak-fire">🔥</span>
+                            <div class="streak-info">
+                                <span class="streak-number" id="statCurrentStreak">0</span>
+                                <span class="streak-label">day streak</span>
+                            </div>
+                        </div>
+                        <div class="streak-best">
+                            <span class="best-number" id="statBestStreak">0</span>
+                            <span class="best-label">best streak</span>
+                        </div>
+                    </div>
+
+                    <div class="difficulty-breakdown">
+                        <h3>Tasks by Difficulty</h3>
+                        <div class="difficulty-rows" id="difficultyStats"></div>
+                    </div>
+
+                    <div class="rewards-claimed-card">
+                        <span class="claimed-icon">🎁</span>
+                        <span class="claimed-number" id="statRewardsClaimed">0</span>
+                        <span class="claimed-label">total rewards claimed</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History View -->
+            <div class="view" id="historyView">
+                <header class="view-header">
+                    <div class="header-info">
+                        <h1>Task History</h1>
+                        <p class="subtitle">All your completed tasks</p>
+                    </div>
+                    <button class="btn btn-secondary" id="viewJsonBtn">
+                        📋 View JSON
+                    </button>
+                </header>
+
+                <div class="history-content" id="historyContent">
+                    <div class="empty-state" id="historyEmpty">
+                        <span class="empty-icon">📜</span>
+                        <h3>No completed tasks yet</h3>
+                        <p>Complete some tasks and they'll appear here!</p>
+                    </div>
+                    <div class="history-list" id="historyList"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add Task Modal -->
+    <div class="modal" id="addTaskModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>New Task</h2>
+                <button class="modal-close" id="closeTaskModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>What needs to be done?</label>
+                    <input type="text" id="taskTitle" placeholder="Task title" autofocus>
+                </div>
+                <div class="form-group">
+                    <label>Notes (optional)</label>
+                    <input type="text" id="taskNotes" placeholder="Add any details...">
+                </div>
+                <div class="form-group">
+                    <label>How challenging is this?</label>
+                    <div class="difficulty-picker" id="difficultyPicker">
+                        <button class="diff-btn" data-difficulty="quick" data-coins="5">
+                            <span class="diff-emoji">🟢</span>
+                            <span class="diff-name">Quick</span>
+                        </button>
+                        <button class="diff-btn" data-difficulty="easy" data-coins="15">
+                            <span class="diff-emoji">🔵</span>
+                            <span class="diff-name">Easy</span>
+                        </button>
+                        <button class="diff-btn selected" data-difficulty="medium" data-coins="25">
+                            <span class="diff-emoji">🟡</span>
+                            <span class="diff-name">Medium</span>
+                        </button>
+                        <button class="diff-btn" data-difficulty="hard" data-coins="50">
+                            <span class="diff-emoji">🟠</span>
+                            <span class="diff-name">Hard</span>
+                        </button>
+                        <button class="diff-btn" data-difficulty="epic" data-coins="75">
+                            <span class="diff-emoji">🔴</span>
+                            <span class="diff-name">Epic</span>
+                        </button>
+                    </div>
+                    <div class="difficulty-info">
+                        <span class="time-estimate" id="timeEstimate">15-45 min</span>
+                        <span class="coin-reward">Reward: <strong id="coinReward">25</strong> coins</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="recurringTaskToggle">
+                        <span class="toggle-text">🔄 Recurring (resets at 6 AM)</span>
+                    </label>
+                </div>
+
+                <!-- Recurring Options (shown when recurring is checked) -->
+                <div class="form-group recurring-options" id="recurringOptions" style="display: none;">
+                    <label>Recurrence type:</label>
+                    <div class="recurrence-type-picker">
+                        <label class="radio-label">
+                            <input type="radio" name="recurrenceType" value="daily" checked>
+                            <span>Every day</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="recurrenceType" value="interval">
+                            <span>Interval (X days on, Y days off)</span>
+                        </label>
+                    </div>
+
+                    <!-- Interval Settings (shown when interval selected) -->
+                    <div class="interval-settings" id="intervalSettings" style="display: none;">
+                        <div class="interval-inputs">
+                            <div class="interval-field">
+                                <label>Active days:</label>
+                                <input type="number" id="activeDaysInput" value="3" min="1" max="30">
+                            </div>
+                            <div class="interval-field">
+                                <label>Break days:</label>
+                                <input type="number" id="breakDaysInput" value="1" min="0" max="30">
+                            </div>
+                        </div>
+                        <div class="interval-field">
+                            <label>Cycle started:</label>
+                            <select id="cycleStartSelect">
+                                <option value="0">Today</option>
+                                <option value="1">Yesterday</option>
+                                <option value="2">2 days ago</option>
+                                <option value="3">3 days ago</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelTask">Cancel</button>
+                <button class="btn btn-primary" id="saveTask">Add Task</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Reward Modal -->
+    <div class="modal" id="addRewardModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>New Reward</h2>
+                <button class="modal-close" id="closeRewardModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>What's the reward?</label>
+                    <input type="text" id="rewardName" placeholder="e.g., Fancy coffee, Gaming time...">
+                </div>
+                <div class="form-group">
+                    <label>Details (optional)</label>
+                    <input type="text" id="rewardDesc" placeholder="Any specifics...">
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <div class="category-picker" id="categoryPicker">
+                        <button class="cat-btn selected" data-category="food">🍕 Food</button>
+                        <button class="cat-btn" data-category="entertainment">🎮 Fun</button>
+                        <button class="cat-btn" data-category="purchase">🛍️ Buy</button>
+                        <button class="cat-btn" data-category="experience">✨ Exp</button>
+                        <button class="cat-btn" data-category="selfcare">💆 Self</button>
+                        <button class="cat-btn" data-category="other">🎁 Other</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Base coin cost: <span class="cost-display" id="costDisplay">50</span></label>
+                    <div class="cost-presets">
+                        <button class="cost-btn" data-cost="1">1</button>
+                        <button class="cost-btn" data-cost="25">25</button>
+                        <button class="cost-btn selected" data-cost="50">50</button>
+                        <button class="cost-btn" data-cost="75">75</button>
+                        <button class="cost-btn" data-cost="100">100</button>
+                        <button class="cost-btn" data-cost="150">150</button>
+                        <button class="cost-btn" data-cost="200">200</button>
+                        <button class="cost-btn" data-cost="500">500</button>
+                    </div>
+                    <input type="range" id="costSlider" min="1" max="500" value="50" step="1">
+                </div>
+
+                <!-- Daily Shop Toggle -->
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="addToShopToggle">
+                        <span class="toggle-text">Add to Daily Shop (price resets at 6 AM)</span>
+                    </label>
+                </div>
+
+                <!-- Scaling Options (shown when Daily Shop is checked) -->
+                <div class="form-group scaling-options" id="scalingOptions" style="display: none;">
+                    <label>Price scaling per purchase:</label>
+                    <div class="scaling-type-picker">
+                        <button class="scaling-btn selected" data-type="add">+ Add</button>
+                        <button class="scaling-btn" data-type="multiply">× Multiply</button>
+                    </div>
+                    <div class="scaling-amount">
+                        <label>Amount: <span id="scalingDisplay">10</span></label>
+                        <div class="scaling-presets" id="scalingPresets">
+                            <button class="scale-preset" data-value="5">+5</button>
+                            <button class="scale-preset selected" data-value="10">+10</button>
+                            <button class="scale-preset" data-value="15">+15</button>
+                            <button class="scale-preset" data-value="25">+25</button>
+                        </div>
+                        <input type="range" id="scalingSlider" min="1" max="100" value="10" step="1">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelReward">Cancel</button>
+                <button class="btn btn-primary" id="saveReward">Add Reward</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Claim Confirmation Modal -->
+    <div class="modal" id="claimModal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>Claim Reward?</h2>
+                <button class="modal-close" id="closeClaimModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="claimMessage">Spend coins on this reward?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelClaim">Cancel</button>
+                <button class="btn btn-success" id="confirmClaim">Claim! 🎉</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
