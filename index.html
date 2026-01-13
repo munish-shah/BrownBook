@@ -5,9 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+        content="default-src 'self' https://*.firebaseio.com https://*.googleapis.com https://*.firebasestorage.app https://cdn-icons-png.flaticon.com; script-src 'self' https://*.gstatic.com https://*.firebaseio.com https://*.googleapis.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://securetoken.googleapis.com;">
     <title>BrownBook</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
 </head>
 
 <body>
@@ -23,6 +25,11 @@
                     <span class="coin-icon">$</span>
                     <span class="coin-amount">0</span>
                 </div>
+            </div>
+
+            <div class="sync-status" id="syncStatus"
+                style="font-size: 10px; opacity: 0.5; margin-top: 4px; display: none;">
+                ☁️ Synced
             </div>
 
             <nav class="nav-tabs">
@@ -49,6 +56,11 @@
                     <span class="streak-icon">🔥</span>
                     <span class="streak-text">0 day streak</span>
                 </div>
+                <!-- Data Import Button (Hidden if data exists) -->
+                <button class="btn-import-data" id="importDataBtn" title="Import Data"
+                    style="display: none; font-size: 16px; margin-top: 10px; background: none; border: none; padding: 4px; cursor: pointer; opacity: 0.6;">
+                    📥
+                </button>
             </div>
         </aside>
 
@@ -184,6 +196,25 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Data Import Modal -->
+    <div class="modal" id="importModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Import Data</h2>
+                <button class="modal-close" id="closeImportModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Paste the JSON data from your desktop app here to sync it to the cloud.</p>
+                <textarea id="importJsonInput" rows="10" placeholder='{"tasks": [], ...}'
+                    style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd;"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelImport">Cancel</button>
+                <button class="btn btn-primary" id="confirmImport">Import & Sync</button>
+            </div>
+        </div>
     </div>
 
     <!-- Add Task Modal -->
@@ -376,7 +407,7 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
 </body>
 
 </html>

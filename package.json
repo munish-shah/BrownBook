@@ -35,5 +35,8 @@
             "app.js",
             "assets/**/*"
         ]
+    },
+    "dependencies": {
+        "firebase": "^12.7.0"
     }
 }

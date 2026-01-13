@@ -1,4 +1,4 @@
-// BrownBook - App Logic
+import { DATA_DOC_REF, onSnapshot, setDoc, getDoc } from "./firebase-config.js";
 
 // Difficulty configurations
 const DIFFICULTIES = {
@@ -19,7 +19,6 @@ const CATEGORIES = {
 };
 
 // Preset shop items with scaling prices
-// scalingType: 'add' (baseCost + count*scaling) or 'multiply' (baseCost * scaling^count)
 const SHOP_ITEMS = [
     { id: 'ep30', name: 'Watch a 30 min episode', emoji: '📺', baseCost: 40, scaling: 10, scalingType: 'add' },
     { id: 'ep45', name: 'Watch a 45 min episode', emoji: '📺', baseCost: 50, scaling: 10, scalingType: 'add' },
@@ -34,14 +33,14 @@ const PRESET_RECURRING_TASKS = [
     { id: 'floss', title: 'Floss', notes: '', difficulty: 'quick' }
 ];
 
-// App state
+// App state - Default structure
 let appData = {
     tasks: [],
-    recurringTasks: [], // Tasks that reset daily at 6AM
-    recurringCompletions: {}, // { 'task_id': 'YYYY-MM-DD' } - tracks which recurring tasks completed today
-    completedHistory: [], // All completed tasks (moved from tasks array)
+    recurringTasks: [],
+    recurringCompletions: {},
+    completedHistory: [],
     rewards: [],
-    customShopItems: [], // User-created shop items with scaling
+    customShopItems: [],
     stats: {
         totalCoinsEarned: 0,
         currentBalance: 0,
@@ -55,84 +54,114 @@ let appData = {
         bestStreak: 0,
         lastActiveDate: null
     },
-    shopPurchases: {}, // { 'ep30': { count: 2, lastResetDate: '2024-01-12' }, ... }
-    presetsInitialized: false // Flag to track if preset recurring tasks have been added
+    shopPurchases: {},
+    presetsInitialized: false
 };
 
 let currentRewardToClaim = null;
 let currentShopItemToClaim = null;
+let isFirstLoad = true;
 
-// Initialize app
+// Initialize app with Firebase
 async function init() {
-    // Load data from storage
-    if (window.electronAPI) {
-        const savedData = await window.electronAPI.loadData();
-        if (savedData) {
-            appData = savedData;
-            // Migrate old data: ensure new fields exist
-            if (!appData.shopPurchases) {
-                appData.shopPurchases = {};
-            }
-            if (!appData.customShopItems) {
-                appData.customShopItems = [];
-            }
-            if (!appData.recurringTasks) {
-                appData.recurringTasks = [];
-            }
-            if (!appData.recurringCompletions) {
-                appData.recurringCompletions = {};
-            }
-            if (!appData.completedHistory) {
-                appData.completedHistory = [];
+    setupEventListeners();
+
+    // Listen for real-time updates from Cloud Firestore
+    onSnapshot(DATA_DOC_REF, (doc) => {
+        if (doc.exists()) {
+            const data = doc.data();
+            appData = { ...appData, ...data }; // Merge with defaults
+
+            // Show sync indicator
+            const syncStatus = document.getElementById('syncStatus');
+            syncStatus.style.display = 'block';
+            setTimeout(() => {
+                syncStatus.style.opacity = '1';
+                setTimeout(() => syncStatus.style.opacity = '0.5', 1000);
+            }, 100);
+
+            // Always show import button to allow data restoration/migration
+            document.getElementById('importDataBtn').style.display = 'block';
+
+            // Run migration/cleanup on first load
+            if (isFirstLoad) {
+                runMigrationsAndCleanup();
+                isFirstLoad = false;
             }
 
-            // Migrate old completed tasks from tasks array to completedHistory
-            const completedInTasks = appData.tasks.filter(t => t.completed);
-            if (completedInTasks.length > 0) {
-                appData.completedHistory = [...completedInTasks, ...appData.completedHistory];
-                appData.tasks = appData.tasks.filter(t => !t.completed);
-                await saveData();
-            }
+            renderAll();
+        } else {
+            // New user or empty db
+            console.log("No data found, starting fresh.");
+            // Show import button
+            document.getElementById('importDataBtn').style.display = 'block';
 
-            // Clear stale recurring completions from previous days
-            const today = getTodayDateString();
-            let hasStaleCompletions = false;
-            for (const taskId in appData.recurringCompletions) {
-                if (appData.recurringCompletions[taskId] !== today) {
-                    delete appData.recurringCompletions[taskId];
-                    hasStaleCompletions = true;
-                }
+            // Initialize presets if needed
+            if (!appData.presetsInitialized) {
+                addPresets();
             }
-            if (hasStaleCompletions) {
-                await saveData();
-            }
+            renderAll();
+        }
+    });
+}
+
+function addPresets() {
+    PRESET_RECURRING_TASKS.forEach(preset => {
+        appData.recurringTasks.push({
+            id: preset.id,
+            title: preset.title,
+            notes: preset.notes,
+            difficulty: preset.difficulty,
+            createdAt: new Date().toISOString()
+        });
+    });
+    appData.presetsInitialized = true;
+    saveData();
+}
+
+async function runMigrationsAndCleanup() {
+    let needsSave = false;
+
+    // Ensure fields exist
+    if (!appData.shopPurchases) { appData.shopPurchases = {}; needsSave = true; }
+    if (!appData.customShopItems) { appData.customShopItems = []; needsSave = true; }
+    if (!appData.recurringTasks) { appData.recurringTasks = []; needsSave = true; }
+    if (!appData.recurringCompletions) { appData.recurringCompletions = {}; needsSave = true; }
+    if (!appData.completedHistory) { appData.completedHistory = []; needsSave = true; }
+
+    // Migrate completed tasks
+    const completedInTasks = appData.tasks.filter(t => t.completed);
+    if (completedInTasks.length > 0) {
+        appData.completedHistory = [...completedInTasks, ...appData.completedHistory];
+        appData.tasks = appData.tasks.filter(t => !t.completed);
+        needsSave = true;
+    }
+
+    // Clear stale recurring completions
+    const today = getTodayDateString();
+    for (const taskId in appData.recurringCompletions) {
+        if (appData.recurringCompletions[taskId] !== today) {
+            delete appData.recurringCompletions[taskId];
+            needsSave = true;
         }
     }
 
-    // Add preset recurring tasks on first run
-    if (!appData.presetsInitialized) {
-        PRESET_RECURRING_TASKS.forEach(preset => {
-            appData.recurringTasks.push({
-                id: preset.id,
-                title: preset.title,
-                notes: preset.notes,
-                difficulty: preset.difficulty,
-                createdAt: new Date().toISOString()
-            });
-        });
-        appData.presetsInitialized = true;
+    if (needsSave) {
         await saveData();
     }
-
-
-    setupEventListeners();
-    renderAll();
 }
 
-// Save data
+// Save data to Cloud Firestore
 async function saveData() {
-    if (window.electronAPI) {
-        await window.electronAPI.saveData(appData);
+    try {
+        await setDoc(DATA_DOC_REF, appData);
+        // Sync indicator flash
+        const syncStatus = document.getElementById('syncStatus');
+        syncStatus.style.opacity = '1';
+        setTimeout(() => syncStatus.style.opacity = '0.5', 500);
+    } catch (e) {
+        console.error("Error saving to cloud:", e);
+        alert("Sync error! Check your connection.");
     }
 }
 
@@ -149,17 +178,44 @@ function setupEventListeners() {
     document.getElementById('cancelTask').addEventListener('click', closeAddTaskModal);
     document.getElementById('saveTask').addEventListener('click', saveNewTask);
 
+    // Import Data Flow
+    document.getElementById('importDataBtn').addEventListener('click', () => {
+        document.getElementById('importModal').classList.add('open');
+    });
+    document.getElementById('closeImportModal').addEventListener('click', () => {
+        document.getElementById('importModal').classList.remove('open');
+    });
+    document.getElementById('cancelImport').addEventListener('click', () => {
+        document.getElementById('importModal').classList.remove('open');
+    });
+    document.getElementById('confirmImport').addEventListener('click', async () => {
+        const jsonStr = document.getElementById('importJsonInput').value;
+        try {
+            const importedData = JSON.parse(jsonStr);
+            if (!importedData.stats) throw new Error("Invalid data format");
+
+            if (confirm("This will OVERWRITE any existing cloud data. Are you sure?")) {
+                appData = importedData;
+                await saveData();
+                document.getElementById('importModal').classList.remove('open');
+                window.location.reload();
+            }
+        } catch (e) {
+            alert("Invalid JSON data. Please check what you pasted.");
+        }
+    });
+
     // Difficulty picker
     document.querySelectorAll('.diff-btn').forEach(btn => {
         btn.addEventListener('click', () => selectDifficulty(btn));
     });
 
-    // Recurring toggle - show/hide recurring options
+    // Recurring toggle
     document.getElementById('recurringTaskToggle').addEventListener('change', (e) => {
         document.getElementById('recurringOptions').style.display = e.target.checked ? 'block' : 'none';
     });
 
-    // Recurrence type radio - show/hide interval settings
+    // Recurrence type radio
     document.querySelectorAll('input[name="recurrenceType"]').forEach(radio => {
         radio.addEventListener('change', (e) => {
             document.getElementById('intervalSettings').style.display =
@@ -178,11 +234,10 @@ function setupEventListeners() {
         btn.addEventListener('click', () => selectCategory(btn));
     });
 
-    // Cost picker
+    // Cost picker & Slider
     document.querySelectorAll('.cost-btn').forEach(btn => {
         btn.addEventListener('click', () => selectCost(parseInt(btn.dataset.cost)));
     });
-
     document.getElementById('costSlider').addEventListener('input', (e) => {
         selectCost(parseInt(e.target.value));
     });
@@ -197,12 +252,10 @@ function setupEventListeners() {
         btn.addEventListener('click', () => selectScalingType(btn.dataset.type));
     });
 
-    // Scaling presets
+    // Scaling presets & Slider
     document.querySelectorAll('.scale-preset').forEach(btn => {
         btn.addEventListener('click', () => selectScaling(parseInt(btn.dataset.value)));
     });
-
-    // Scaling slider
     document.getElementById('scalingSlider').addEventListener('input', (e) => {
         selectScaling(parseInt(e.target.value));
     });
@@ -224,11 +277,10 @@ function setupEventListeners() {
         });
     });
 
-    // Enter key for task input
+    // Enter key shortcuts
     document.getElementById('taskTitle').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') saveNewTask();
     });
-
     document.getElementById('rewardName').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') saveNewReward();
     });
