@@ -1,10 +1,10 @@
 # BrownBook 📔
 
-A gamified task and habit tracker app built with Electron. Turn your daily to-dos into an RPG-like experience!
+A gamified task tracker app built with Electron. Turn your daily to-dos into a rewarding experience!
 
 ## Features
 
-- **✅ Task Management**: Create one-time tasks and recurring habits.
+- **✅ Task Management**: Create one-time tasks and recurring tasks.
 - **🔄 Interval Recurring Tasks**: Set up complex schedules like "3 days on, 1 day off" for gym routines.
 - **💰 Reward System**: Earn coins for completing tasks (`Hard` tasks = more coins!).
 - **🛍️ Rewards Shop**: Spend coins on custom rewards. Shop prices increase after each purchase daily to prevent spamming!
