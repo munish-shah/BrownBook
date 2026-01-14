@@ -1,21 +1,37 @@
-# Dependencies
-node_modules/
-
 # OS generated files
 .DS_Store
 .AppleDouble
 .LSOverride
+._*
+.Spotlight-V100
+.Trashes
 
-# Electron build outputs
+# Dependencies
+node_modules/
+
+# Build outputs
 dist/
 out/
 build/
 
-# Local env files (if any)
+# Local Environment & Secrets
 .env
 .env.local
+firebase-config.js.backup
 
 # Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+firebase-debug.log*
+
+# Backups and Dumps
+*.bak
+*.backup
+old_data_backup.json
+*_backup.json
+
+# Tooling
+.vscode/
+.idea/
+.firebase/
