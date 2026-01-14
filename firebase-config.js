@@ -1,6 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, doc, onSnapshot, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBM0DZHR1EimSQ7ryKuteskO7-jSqw2BKk",
@@ -14,7 +13,9 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app);
-const provider = new GoogleAuthProvider();
 
-export { db, auth, provider, signInWithPopup, signOut, onAuthStateChanged, doc, onSnapshot, setDoc, getDoc };
+// Data Reference (Single document for simplicity for single user)
+// In a multi-user app, this would be users/{userId}
+const DATA_DOC_REF = doc(db, "users", "primary_user");
+
+export { db, DATA_DOC_REF, onSnapshot, setDoc, getDoc };

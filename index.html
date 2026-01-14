@@ -56,18 +56,11 @@
                     <span class="streak-icon">🔥</span>
                     <span class="streak-text">0 day streak</span>
                 </div>
-                <div style="display: flex; gap: 8px; justify-content: center; margin-top: 10px;">
-                    <!-- Data Import Button -->
-                    <button class="btn-import-data" id="importDataBtn" title="Import Data"
-                        style="display: none; font-size: 16px; background: none; border: none; padding: 4px; cursor: pointer; opacity: 0.6;">
-                        📥
-                    </button>
-                    <!-- Logout Button -->
-                    <button id="logoutBtn" title="Sign Out"
-                        style="display: none; font-size: 16px; background: none; border: none; padding: 4px; cursor: pointer; opacity: 0.6;">
-                        👋
-                    </button>
-                </div>
+                <!-- Data Import Button (Hidden if data exists) -->
+                <button class="btn-import-data" id="importDataBtn" title="Import Data"
+                    style="display: none; font-size: 16px; margin-top: 10px; background: none; border: none; padding: 4px; cursor: pointer; opacity: 0.6;">
+                    📥
+                </button>
             </div>
         </aside>
 
@@ -412,25 +405,9 @@
                 <button class="btn btn-success" id="confirmClaim">Claim! 🎉</button>
             </div>
         </div>
-        <!-- Login Modal (Full Screen Overlay) -->
-        <div class="modal" id="loginModal" style="display: none; background: var(--bg-primary); z-index: 2000;">
-            <div class="modal-content" style="text-align: center; max-width: 360px; padding: 40px;">
-                <div style="font-size: 64px; margin-bottom: 20px;">📕</div>
-                <h1 style="margin-bottom: 10px;">BrownBook</h1>
-                <p style="color: var(--text-secondary); margin-bottom: 30px;">Your focus, gamified.</p>
+    </div>
 
-                <button id="googleLoginBtn" class="btn btn-primary"
-                    style="width: 100%; justify-content: center; padding: 12px; font-size: 16px;">
-                    <span style="font-size: 18px;">🔑</span> Sign in with Google
-                </button>
-                <p style="font-size: 12px; color: var(--text-muted); margin-top: 20px;">
-                    Sign in to sync your tasks across devices.
-                </p>
-            </div>
-        </div>
-
-        <!-- Scripts -->
-        <script type="module" src="app.js"></script>
+    <script type="module" src="app.js"></script>
 </body>
 
 </html>
