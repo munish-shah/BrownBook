@@ -139,6 +139,29 @@ async function runMigrationsAndCleanup() {
 
     // Clear stale recurring completions
     const today = getTodayDateString();
+
+    // Recovery: Check history for today's recurring completions (fixes timezone bug data loss)
+    // Only runs if we have history but map entry is missing
+    if (appData.completedHistory) {
+        appData.completedHistory.forEach(h => {
+            if (h.isRecurring && h.completedAt) {
+                const date = new Date(h.completedAt);
+                // Construct local YYYY-MM-DD from the history timestamp
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hDate = `${year}-${month}-${day}`;
+
+                if (hDate === today) {
+                    // It was completed today, ensure it's marked
+                    if (!appData.recurringCompletions[h.recurringId]) {
+                        appData.recurringCompletions[h.recurringId] = today;
+                        needsSave = true;
+                    }
+                }
+            }
+        });
+    }
     for (const taskId in appData.recurringCompletions) {
         if (appData.recurringCompletions[taskId] !== today) {
             delete appData.recurringCompletions[taskId];
