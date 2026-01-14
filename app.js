@@ -836,15 +836,19 @@ function deleteTask(id) {
 // ============= REWARDS & SHOP =============
 
 // Get the reset date string for 6AM local time
+// Get today's date string for shop reset (uses 6AM logic)
+// Get today's date string for shop reset (uses 6AM logic)
 function getResetDateString() {
     const now = new Date();
-
-    // If it's before 6AM, we're still in "yesterday's" reset period
     if (now.getHours() < 6) {
         now.setDate(now.getDate() - 1);
     }
 
-    return now.toISOString().split('T')[0]; // YYYY-MM-DD
+    // Use LOCAL time, not ISO (which is UTC)
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 // Get current price for a shop item
