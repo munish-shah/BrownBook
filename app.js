@@ -155,12 +155,37 @@ async function runMigrationsAndCleanup() {
     // Clear stale recurring completions
     const today = getTodayDateString();
 
-    // COMPENSATION: One-time coin grant for the bug
-    if (!appData.stats.compensated_bug_2026_01) {
-        appData.stats.currentBalance += 1000;
-        appData.stats.totalCoinsEarned += 1000;
-        appData.stats.compensated_bug_2026_01 = true;
-        alert("💰 +1000 Coins added to your balance as an apology for the bug!");
+    // Clear stale recurring completions
+    const today = getTodayDateString();
+
+    // RECALCULATE ECONOMY ONCE (Fixes the coin drain bug precisely)
+    // The bug reduced both TotalEarned and CurrentBalance equally.
+    // So: Spent = TotalEarned - CurrentBalance (This remains accurate).
+    // We can reconstruct True TotalEarned from history, then restore Balance.
+    if (!appData.stats.economy_recalc_2026_01) {
+        // 1. Calculate implied spending (how much is missing from the total)
+        const impliedSpending = appData.stats.totalCoinsEarned - appData.stats.currentBalance;
+
+        // 2. Reconstruct True Earnings from History
+        let trueTotalEarned = 0;
+        appData.completedHistory.forEach(t => {
+            if (t.difficulty && DIFFICULTIES[t.difficulty]) {
+                trueTotalEarned += DIFFICULTIES[t.difficulty].coins;
+            }
+        });
+
+        // 3. Apply corrections
+        const oldBalance = appData.stats.currentBalance;
+        appData.stats.totalCoinsEarned = trueTotalEarned;
+        appData.stats.currentBalance = trueTotalEarned - impliedSpending;
+
+        appData.stats.economy_recalc_2026_01 = true;
+
+        const diff = appData.stats.currentBalance - oldBalance;
+        if (diff !== 0) {
+            console.log(`Economy repaired. Balance adjusted by ${diff > 0 ? '+' : ''}${diff}`);
+            alert(`Economy Recalculated 🧮\nYour balance has been corrected based on your task history.\nCorrection: ${diff > 0 ? '+' : ''}${diff} coins.`);
+        }
         needsSave = true;
     }
 
