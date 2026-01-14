@@ -68,6 +68,19 @@ let isFirstLoad = true;
 
 // Initialize app with Firebase Auth
 function init() {
+    // Setup listeners immediately so buttons work
+    setupAuthListeners();
+
+    // Fallback: If auth takes too long (or blocked), show login screen
+    setTimeout(() => {
+        const loginModal = document.getElementById('loginModal');
+        // If still hidden and no user loaded
+        if (loginModal.style.display === 'none' && !DATA_DOC_REF) {
+            console.log("Auth timeout/block, forcing login screen");
+            loginModal.style.display = 'flex';
+        }
+    }, 1500);
+
     // Listen for auth state changes
     onAuthStateChanged(auth, (user) => {
         const loginModal = document.getElementById('loginModal');
@@ -82,10 +95,9 @@ function init() {
             // Set user-specific document reference
             DATA_DOC_REF = doc(db, "users", user.uid);
 
-            // Setup UI Listeners (only once)
+            // Setup Main App Listeners (only once)
             if (!listenersSet) {
                 setupEventListeners();
-                setupAuthListeners();
                 listenersSet = true;
             }
 
