@@ -344,6 +344,21 @@ function setupEventListeners() {
         });
     });
 
+    // Expiration dropdown - show custom datetime picker when "custom" selected
+    document.getElementById('taskExpiration').addEventListener('change', (e) => {
+        const customDT = document.getElementById('customExpirationDT');
+        if (e.target.value === 'custom') {
+            customDT.style.display = 'block';
+            // Set min to now
+            const now = new Date();
+            const localIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+            customDT.min = localIso;
+            customDT.value = ''; // Clear any old value
+        } else {
+            customDT.style.display = 'none';
+        }
+    });
+
     // Add Reward
     document.getElementById('addRewardBtn').addEventListener('click', openAddRewardModal);
     document.getElementById('closeRewardModal').addEventListener('click', closeAddRewardModal);
@@ -723,6 +738,8 @@ function openAddTaskModal() {
     document.getElementById('intervalSettings').style.display = 'none';
     document.getElementById('expirationOptions').style.display = 'block'; // Show expiration for non-recurring
     document.getElementById('taskExpiration').value = ''; // Reset to no expiration
+    document.getElementById('customExpirationDT').style.display = 'none'; // Hide custom picker
+    document.getElementById('customExpirationDT').value = ''; // Clear custom value
     document.querySelector('input[name="recurrenceType"][value="daily"]').checked = true;
     document.getElementById('activeDaysInput').value = '3';
     document.getElementById('breakDaysInput').value = '1';
@@ -793,7 +810,14 @@ function saveNewTask() {
 
         // Handle expiration
         const expirationDays = document.getElementById('taskExpiration').value;
-        if (expirationDays !== '') {
+        if (expirationDays === 'custom') {
+            // Use custom datetime picker value
+            const customDT = document.getElementById('customExpirationDT').value;
+            if (customDT) {
+                task.expiresAt = new Date(customDT).toISOString();
+            }
+        } else if (expirationDays !== '') {
+            // Use preset (next 6AM + days)
             const now = new Date();
             let next6AM = new Date(now);
             next6AM.setHours(6, 0, 0, 0);
