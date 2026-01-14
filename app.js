@@ -756,9 +756,21 @@ function toggleRecurringTask(id) {
         delete appData.recurringCompletions[id];
 
         // Remove from completedHistory (find today's entry for this recurring task)
-        const historyIndex = appData.completedHistory.findIndex(t =>
-            t.recurringId === id && t.completedAt && t.completedAt.startsWith(today)
-        );
+        const historyIndex = appData.completedHistory.findIndex(t => {
+            if (t.recurringId !== id || !t.completedAt) return false;
+
+            // Convert history timestamp to "App Date" (Local + 6AM offset)
+            const date = new Date(t.completedAt);
+            if (date.getHours() < 6) date.setDate(date.getDate() - 1);
+
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hDate = `${year}-${month}-${day}`;
+
+            return hDate === today;
+        });
+
         if (historyIndex !== -1) {
             appData.completedHistory.splice(historyIndex, 1);
         }
