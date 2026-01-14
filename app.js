@@ -221,7 +221,34 @@ async function runMigrationsAndCleanup() {
         }
     }
 
-    // Also remove stale completions from map (previous logic)
+    // REVERSE Cleanup: If it's in recurringCompletions but NOT in history, it's orphaned (remove it)
+    // This fixes tasks showing as "checked" without actually being completed
+    for (const taskId in appData.recurringCompletions) {
+        if (appData.recurringCompletions[taskId] === today) {
+            // Check if there's a matching history entry for this task today
+            const hasHistoryEntry = appData.completedHistory.some(h => {
+                if (h.recurringId !== taskId || !h.completedAt) return false;
+
+                const date = new Date(h.completedAt);
+                if (date.getHours() < 6) date.setDate(date.getDate() - 1);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hDate = `${year}-${month}-${day}`;
+
+                return hDate === today;
+            });
+
+            if (!hasHistoryEntry) {
+                // Orphaned completion - remove it
+                console.log(`Removing orphaned completion for ${taskId}`);
+                delete appData.recurringCompletions[taskId];
+                needsSave = true;
+            }
+        }
+    }
+
+    // Also remove stale completions from map (different day)
     for (const taskId in appData.recurringCompletions) {
         if (appData.recurringCompletions[taskId] !== today) {
             delete appData.recurringCompletions[taskId];
