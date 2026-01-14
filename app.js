@@ -1,4 +1,8 @@
-import { DATA_DOC_REF, onSnapshot, setDoc, getDoc } from "./firebase-config.js";
+import { db, auth, provider, signInWithPopup, signOut, onAuthStateChanged, doc, onSnapshot, setDoc, getDoc } from "./firebase-config.js";
+
+let DATA_DOC_REF = null; // set on login
+let unsubscribeSnapshot = null;
+let listenersSet = false;
 
 // Difficulty configurations
 const DIFFICULTIES = {
@@ -62,12 +66,70 @@ let currentRewardToClaim = null;
 let currentShopItemToClaim = null;
 let isFirstLoad = true;
 
-// Initialize app with Firebase
-async function init() {
-    setupEventListeners();
+// Initialize app with Firebase Auth
+function init() {
+    // Listen for auth state changes
+    onAuthStateChanged(auth, (user) => {
+        const loginModal = document.getElementById('loginModal');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        if (user) {
+            // User is signed in
+            console.log("User signed in:", user.uid);
+            loginModal.style.display = 'none';
+            logoutBtn.style.display = 'block';
+
+            // Set user-specific document reference
+            DATA_DOC_REF = doc(db, "users", user.uid);
+
+            // Setup UI Listeners (only once)
+            if (!listenersSet) {
+                setupEventListeners();
+                setupAuthListeners();
+                listenersSet = true;
+            }
+
+            // Subscribe to data
+            subscribeToData();
+        } else {
+            // User is signed out
+            console.log("User signed out");
+            loginModal.style.display = 'flex';
+            logoutBtn.style.display = 'none';
+
+            if (unsubscribeSnapshot) {
+                unsubscribeSnapshot();
+                unsubscribeSnapshot = null;
+            }
+        }
+    });
+}
+
+function setupAuthListeners() {
+    // Login
+    document.getElementById('googleLoginBtn').addEventListener('click', async () => {
+        try {
+            await signInWithPopup(auth, provider);
+        } catch (error) {
+            console.error("Login failed:", error);
+            alert("Login failed. Please try again.");
+        }
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+        if (confirm("Sign out?")) {
+            await signOut(auth);
+            location.reload(); // Reload to clear state cleanly
+        }
+    });
+}
+
+function subscribeToData() {
+    if (unsubscribeSnapshot) unsubscribeSnapshot();
 
     // Listen for real-time updates from Cloud Firestore
-    onSnapshot(DATA_DOC_REF, (doc) => {
+    unsubscribeSnapshot = onSnapshot(DATA_DOC_REF, (doc) => {
         if (doc.exists()) {
             const data = doc.data();
             appData = { ...appData, ...data }; // Merge with defaults
@@ -92,7 +154,7 @@ async function init() {
             renderAll();
         } else {
             // New user or empty db
-            console.log("No data found, starting fresh.");
+            console.log("No data found for user, starting fresh.");
             // Show import button
             document.getElementById('importDataBtn').style.display = 'block';
 
