@@ -155,28 +155,51 @@ async function runMigrationsAndCleanup() {
     // Clear stale recurring completions
     const today = getTodayDateString();
 
-    // Recovery: Check history for today's recurring completions (fixes timezone bug data loss)
-    // Only runs if we have history but map entry is missing
-    if (appData.completedHistory) {
-        appData.completedHistory.forEach(h => {
-            if (h.isRecurring && h.completedAt) {
-                const date = new Date(h.completedAt);
-                // Construct local YYYY-MM-DD from the history timestamp
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                const hDate = `${year}-${month}-${day}`;
+    // COMPENSATION: One-time coin grant for the bug
+    if (!appData.stats.compensated_bug_2026_01) {
+        appData.stats.currentBalance += 1000;
+        appData.stats.totalCoinsEarned += 1000;
+        appData.stats.compensated_bug_2026_01 = true;
+        alert("💰 +1000 Coins added to your balance as an apology for the bug!");
+        needsSave = true;
+    }
 
-                if (hDate === today) {
-                    // It was completed today, ensure it's marked
-                    if (!appData.recurringCompletions[h.recurringId]) {
-                        appData.recurringCompletions[h.recurringId] = today;
-                        needsSave = true;
-                    }
+    // Cleanup: Sync History with Recurrence State
+    // If it's in history for TODAY but NOT in recurringCompletions, it means it was unchecked (but history delete failed).
+    // So we should REMOVE it from History.
+    // If it's in recurringCompletions but NOT history, we leave it (or add to history? strictly logic 1 is mostly needed).
+
+    if (appData.completedHistory) {
+        // Filter OUT zombie tasks
+        const initialLength = appData.completedHistory.length;
+        appData.completedHistory = appData.completedHistory.filter(h => {
+            if (!h.isRecurring || !h.completedAt) return true; // Keep regular tasks
+
+            // Check if this recurring task matches TODAY
+            const date = new Date(h.completedAt);
+            if (date.getHours() < 6) date.setDate(date.getDate() - 1);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hDate = `${year}-${month}-${day}`;
+
+            if (hDate === today) {
+                // It is today's record. Is it marked completed in state?
+                if (!appData.recurringCompletions[h.recurringId]) {
+                    // It is NOT in completions map. It's a zombie. Kill it.
+                    return false;
                 }
             }
+            return true;
         });
+
+        if (appData.completedHistory.length !== initialLength) {
+            console.log("Removed zombie history items.");
+            needsSave = true;
+        }
     }
+
+    // Also remove stale completions from map (previous logic)
     for (const taskId in appData.recurringCompletions) {
         if (appData.recurringCompletions[taskId] !== today) {
             delete appData.recurringCompletions[taskId];
