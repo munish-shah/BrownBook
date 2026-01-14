@@ -155,9 +155,6 @@ async function runMigrationsAndCleanup() {
     // Clear stale recurring completions
     const today = getTodayDateString();
 
-    // Clear stale recurring completions
-    const today = getTodayDateString();
-
     // RECALCULATE ECONOMY ONCE (Fixes the coin drain bug precisely)
     // The bug reduced both TotalEarned and CurrentBalance equally.
     // So: Spent = TotalEarned - CurrentBalance (This remains accurate).
