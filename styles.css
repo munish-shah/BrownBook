@@ -1543,6 +1543,9 @@ input[type="range"]::-webkit-slider-thumb {
         margin-left: auto;
         margin-right: 12px;
         cursor: pointer;
+        position: relative;
+        z-index: 200;
+        /* Ensure on top */
     }
 
     /* Bottom Navigation */

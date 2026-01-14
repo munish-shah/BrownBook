@@ -387,6 +387,27 @@ function setupKeyManagement() {
             alert("Key is too short!");
         }
     });
+
+    // Recover Legacy Data
+    document.getElementById('recoverLegacyBtn')?.addEventListener('click', async () => {
+        if (confirm("⚠️ This will OVERWRITE your current data with the old 'primary_user' backup. Are you sure?")) {
+            try {
+                const legacyDocRef = doc(db, "users", "primary_user");
+                const legacySnap = await getDoc(legacyDocRef);
+
+                if (legacySnap.exists()) {
+                    await setDoc(DATA_DOC_REF, legacySnap.data());
+                    alert("Data recovered! Reloading...");
+                    location.reload();
+                } else {
+                    alert("No legacy data found.");
+                }
+            } catch (error) {
+                console.error("Recovery failed:", error);
+                alert("Recovery failed: " + error.message);
+            }
+        }
+    });
 }
 
 // Update coin display in sidebar
