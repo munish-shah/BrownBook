@@ -1491,7 +1491,8 @@ input[type="range"]::-webkit-slider-thumb {
         height: auto;
         background: transparent;
         padding: 0;
-        display: contents; /* Allows children to be positioned freely */
+        display: contents;
+        /* Allows children to be positioned freely */
     }
 
     /* Top Header */
@@ -1512,11 +1513,37 @@ input[type="range"]::-webkit-slider-thumb {
         height: calc(60px + env(safe-area-inset-top));
     }
 
-    .app-logo { margin: 0; }
-    .app-name { font-size: 18px; }
-    .logo-icon { font-size: 24px; }
-    .coin-display { padding: 6px 12px; }
-    .coin-amount { font-size: 16px; }
+    .app-logo {
+        margin: 0;
+    }
+
+    .app-name {
+        font-size: 18px;
+    }
+
+    .logo-icon {
+        font-size: 24px;
+    }
+
+    .coin-display {
+        padding: 6px 12px;
+    }
+
+    .coin-amount {
+        font-size: 16px;
+    }
+
+    /* Show Mobile Key Button */
+    .mobile-key-btn {
+        display: block !important;
+        background: none;
+        border: none;
+        font-size: 24px;
+        padding: 8px;
+        margin-left: auto;
+        margin-right: 12px;
+        cursor: pointer;
+    }
 
     /* Bottom Navigation */
     .nav-tabs {
@@ -1552,11 +1579,19 @@ input[type="range"]::-webkit-slider-thumb {
         background: transparent;
         color: var(--accent-warm);
     }
-    
-    .nav-tab:hover { background: transparent; }
 
-    .tab-icon { font-size: 20px; margin-bottom: 2px; }
-    .tab-label { font-size: 10px; }
+    .nav-tab:hover {
+        background: transparent;
+    }
+
+    .tab-icon {
+        font-size: 20px;
+        margin-bottom: 2px;
+    }
+
+    .tab-label {
+        font-size: 10px;
+    }
 
     /* Main Content Area */
     .main-content {
@@ -1567,33 +1602,40 @@ input[type="range"]::-webkit-slider-thumb {
         flex: 1;
         overflow-y: auto;
     }
-    
-    .sync-status { display: none !important; }
+
+    .sync-status {
+        display: none !important;
+    }
 
     .sidebar-footer {
-        display: none; /* Hide streak/import on mobile footer */
+        display: none;
+        /* Hide streak/import on mobile footer */
     }
 
     /* Force 16px font size on inputs to prevent zoom */
-    input, select, textarea {
+    input,
+    select,
+    textarea {
         font-size: 16px !important;
     }
-    
+
     /* Adjust Modals */
     .modal-content {
         width: 92%;
         max-height: 85vh;
         margin: 0 auto;
     }
-    
+
     .stats-cards {
         grid-template-columns: 1fr;
     }
-    
-    .difficulty-breakdown, .streak-card, .rewards-claimed-card {
+
+    .difficulty-breakdown,
+    .streak-card,
+    .rewards-claimed-card {
         padding: 16px;
     }
-    
+
     .cost-presets {
         grid-template-columns: repeat(4, 1fr);
     }
