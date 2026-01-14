@@ -152,6 +152,15 @@ async function runMigrationsAndCleanup() {
         needsSave = true;
     }
 
+    // Delete expired tasks (uncompleted tasks past their expiration)
+    const now = new Date();
+    const expiredCount = appData.tasks.filter(t => t.expiresAt && new Date(t.expiresAt) <= now).length;
+    if (expiredCount > 0) {
+        appData.tasks = appData.tasks.filter(t => !t.expiresAt || new Date(t.expiresAt) > now);
+        console.log(`Removed ${expiredCount} expired task(s).`);
+        needsSave = true;
+    }
+
     // Clear stale recurring completions
     const today = getTodayDateString();
 
@@ -323,6 +332,8 @@ function setupEventListeners() {
     // Recurring toggle
     document.getElementById('recurringTaskToggle').addEventListener('change', (e) => {
         document.getElementById('recurringOptions').style.display = e.target.checked ? 'block' : 'none';
+        // Hide expiration for recurring tasks (they reset, not expire)
+        document.getElementById('expirationOptions').style.display = e.target.checked ? 'none' : 'block';
     });
 
     // Recurrence type radio
@@ -641,6 +652,15 @@ function renderTasks() {
 
 function createTaskRow(task, isCompleted) {
     const diff = DIFFICULTIES[task.difficulty];
+
+    // Calculate expiration timer if applicable
+    let expiryHtml = '';
+    if (task.expiresAt && !isCompleted) {
+        const timeLeft = getTimeRemaining(task.expiresAt);
+        const isUrgent = timeLeft.totalMs < 2 * 60 * 60 * 1000; // < 2 hours
+        expiryHtml = `<span class="task-expiry ${isUrgent ? 'urgent' : ''}">${timeLeft.display}</span>`;
+    }
+
     return `
         <div class="task-row ${isCompleted ? 'completed' : ''}" data-id="${task.id}">
             <div class="task-checkbox ${isCompleted ? 'completed-task' : ''} ${task.difficulty} ${isCompleted ? 'checked' : ''}" data-id="${task.id}">
@@ -650,12 +670,29 @@ function createTaskRow(task, isCompleted) {
                 <div class="task-title">${escapeHtml(task.title)}</div>
                 ${task.notes ? `<div class="task-notes">${escapeHtml(task.notes)}</div>` : ''}
             </div>
+            ${expiryHtml}
             <div class="task-coins ${task.difficulty}">
                 ${diff.emoji} ${diff.coins}
             </div>
             ${!isCompleted ? `<button class="task-delete" data-id="${task.id}">🗑</button>` : ''}
         </div>
     `;
+}
+
+// Helper: Calculate time remaining until expiration
+function getTimeRemaining(expiresAt) {
+    const diff = new Date(expiresAt) - new Date();
+    if (diff <= 0) {
+        return { display: 'Expired', totalMs: 0 };
+    }
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (hours >= 24) {
+        const days = Math.floor(hours / 24);
+        return { display: `⏰ ${days}d ${hours % 24}h`, totalMs: diff };
+    }
+    return { display: `⏰ ${hours}h ${minutes}m`, totalMs: diff };
 }
 
 function createRecurringTaskRow(task, isCompleted) {
@@ -684,6 +721,8 @@ function openAddTaskModal() {
     document.getElementById('recurringTaskToggle').checked = false;
     document.getElementById('recurringOptions').style.display = 'none';
     document.getElementById('intervalSettings').style.display = 'none';
+    document.getElementById('expirationOptions').style.display = 'block'; // Show expiration for non-recurring
+    document.getElementById('taskExpiration').value = ''; // Reset to no expiration
     document.querySelector('input[name="recurrenceType"][value="daily"]').checked = true;
     document.getElementById('activeDaysInput').value = '3';
     document.getElementById('breakDaysInput').value = '1';
@@ -751,6 +790,22 @@ function saveNewTask() {
             completed: false,
             createdAt: new Date().toISOString()
         };
+
+        // Handle expiration
+        const expirationDays = document.getElementById('taskExpiration').value;
+        if (expirationDays !== '') {
+            const now = new Date();
+            let next6AM = new Date(now);
+            next6AM.setHours(6, 0, 0, 0);
+            // If already past 6AM today, next 6AM is tomorrow
+            if (now.getHours() >= 6) {
+                next6AM.setDate(next6AM.getDate() + 1);
+            }
+            // Add the offset days
+            next6AM.setDate(next6AM.getDate() + parseInt(expirationDays));
+            task.expiresAt = next6AM.toISOString();
+        }
+
         appData.tasks.unshift(task);
     }
 

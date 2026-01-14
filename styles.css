@@ -408,6 +408,22 @@ body {
     background: rgba(231, 87, 87, 0.15);
 }
 
+/* Expiration Timer */
+.task-expiry {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.task-expiry.urgent {
+    color: var(--diff-epic);
+    background: rgba(231, 87, 87, 0.1);
+    font-weight: 500;
+}
+
 .task-delete {
     opacity: 0;
     padding: 6px;

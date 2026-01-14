@@ -317,6 +317,19 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Expiration Options (hidden when recurring is checked) -->
+                <div class="form-group" id="expirationOptions">
+                    <label>Expires in (optional)</label>
+                    <select id="taskExpiration">
+                        <option value="">No expiration</option>
+                        <option value="0">Today (next 6 AM)</option>
+                        <option value="1">1 day</option>
+                        <option value="2">2 days</option>
+                        <option value="3">3 days</option>
+                        <option value="7">1 week</option>
+                    </select>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="cancelTask">Cancel</button>
