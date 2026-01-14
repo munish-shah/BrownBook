@@ -355,10 +355,14 @@ function setupKeyManagement() {
     const input = document.getElementById('secretKeyInput');
 
     // Open Modal
-    document.getElementById('manageKeyBtn').addEventListener('click', () => {
+    const openModal = () => {
         input.value = SECRET_KEY;
         modal.classList.add('open');
-    });
+    };
+
+    document.getElementById('manageKeyBtn').addEventListener('click', openModal);
+    // Listen for the Mobile Nav Tab version of the key button
+    document.getElementById('navKeyBtn')?.addEventListener('click', openModal);
 
     // Close Modal
     document.getElementById('closeKeyModal').addEventListener('click', () => {
