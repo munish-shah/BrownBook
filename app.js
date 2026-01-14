@@ -356,6 +356,7 @@ function getTodayDateString() {
     if (now.getHours() < 6) {
         now.setDate(now.getDate() - 1);
     }
+
     // Use LOCAL time, not ISO (which is UTC)
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
