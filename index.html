@@ -61,6 +61,11 @@
                     style="display: none; font-size: 16px; margin-top: 10px; background: none; border: none; padding: 4px; cursor: pointer; opacity: 0.6;">
                     📥
                 </button>
+                <!-- Sync/Key Button -->
+                <button class="btn-sync-key" id="manageKeyBtn" title="Link Device / Secret Key"
+                    style="font-size: 16px; margin-top: 10px; background: none; border: none; padding: 4px; cursor: pointer; opacity: 0.6;">
+                    🔑
+                </button>
             </div>
         </aside>
 
@@ -403,6 +408,35 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="cancelClaim">Cancel</button>
                 <button class="btn btn-success" id="confirmClaim">Claim! 🎉</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Secret Key / Link Device Modal -->
+    <div class="modal" id="keyModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Link Device 🔑</h2>
+                <button class="modal-close" id="closeKeyModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Your Secret Save Key:</strong></p>
+                <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+                    <input type="text" id="secretKeyInput"
+                        style="flex: 1; padding: 10px; font-family: monospace; font-size: 16px; border: 1px solid #444; background: #222; color: #eecfa1; border-radius: 6px;">
+                    <button id="copyKeyBtn" class="btn btn-secondary" style="padding: 0 12px;">📋</button>
+                </div>
+
+                <p style="font-size: 13px; color: #888; line-height: 1.5;">
+                    To sync this device with another (like your Mac), copy keeping the same key on both devices.
+                    <br><br>
+                    <span style="color: #ff6b6b;">Warning: Changing this key will switch to a different save
+                        file!</span>
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelKeyChange">Cancel</button>
+                <button class="btn btn-primary" id="saveKeyChange">Load/Sync Key</button>
             </div>
         </div>
     </div>

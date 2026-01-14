@@ -14,8 +14,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Data Reference (Single document for simplicity for single user)
-// In a multi-user app, this would be users/{userId}
-const DATA_DOC_REF = doc(db, "users", "primary_user");
+// Data Reference is now managed dynamically in app.js based on localStorage ID
 
-export { db, DATA_DOC_REF, onSnapshot, setDoc, getDoc };
+export { db, doc, onSnapshot, setDoc, getDoc };

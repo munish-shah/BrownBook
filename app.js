@@ -1,4 +1,16 @@
-import { DATA_DOC_REF, onSnapshot, setDoc, getDoc } from "./firebase-config.js";
+import { db, doc, onSnapshot, setDoc, getDoc } from "./firebase-config.js";
+
+let DATA_DOC_REF = null; // Set dynamically based on secret key
+let SECRET_KEY = localStorage.getItem('brownbook_secret_key');
+
+// Generate random key if none exists (First load)
+if (!SECRET_KEY) {
+    SECRET_KEY = 'user_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+    localStorage.setItem('brownbook_secret_key', SECRET_KEY);
+}
+
+// Set reference immediately
+DATA_DOC_REF = doc(db, "users", SECRET_KEY);
 
 // Difficulty configurations
 const DIFFICULTIES = {
@@ -65,6 +77,9 @@ let isFirstLoad = true;
 // Initialize app with Firebase
 async function init() {
     setupEventListeners();
+    setupKeyManagement(); // Setup the new key UI
+
+    console.log("Using Secret Key:", SECRET_KEY);
 
     // Listen for real-time updates from Cloud Firestore
     onSnapshot(DATA_DOC_REF, (doc) => {
@@ -92,7 +107,7 @@ async function init() {
             renderAll();
         } else {
             // New user or empty db
-            console.log("No data found, starting fresh.");
+            console.log("No data found for this key, starting fresh.");
             // Show import button
             document.getElementById('importDataBtn').style.display = 'block';
 
@@ -332,6 +347,46 @@ function renderAll() {
     renderHistory();
     updateCoinDisplay();
     updateStreakDisplay();
+}
+
+// Key Management UI
+function setupKeyManagement() {
+    const modal = document.getElementById('keyModal');
+    const input = document.getElementById('secretKeyInput');
+
+    // Open Modal
+    document.getElementById('manageKeyBtn').addEventListener('click', () => {
+        input.value = SECRET_KEY;
+        modal.classList.add('open');
+    });
+
+    // Close Modal
+    document.getElementById('closeKeyModal').addEventListener('click', () => {
+        modal.classList.remove('open');
+    });
+    document.getElementById('cancelKeyChange').addEventListener('click', () => {
+        modal.classList.remove('open');
+    });
+
+    // Copy Key
+    document.getElementById('copyKeyBtn').addEventListener('click', () => {
+        input.select();
+        document.execCommand('copy');
+        const btn = document.getElementById('copyKeyBtn');
+        btn.textContent = '✅';
+        setTimeout(() => btn.textContent = '📋', 1000);
+    });
+
+    // Save/Load Key
+    document.getElementById('saveKeyChange').addEventListener('click', () => {
+        const newKey = input.value.trim();
+        if (newKey && newKey.length > 3) {
+            localStorage.setItem('brownbook_secret_key', newKey);
+            location.reload(); // Reload to switch user
+        } else {
+            alert("Key is too short!");
+        }
+    });
 }
 
 // Update coin display in sidebar
