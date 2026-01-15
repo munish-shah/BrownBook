@@ -1518,13 +1518,15 @@ function renderStats() {
 
     // Rewards claimed
     document.getElementById('statRewardsClaimed').textContent = stats.rewardsClaimed;
+}
 
+// ============= UTILITIES =============
 
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
 
-    // Start the app
-    init();
+// Start the app
+init();
