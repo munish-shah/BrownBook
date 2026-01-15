@@ -31,12 +31,8 @@ const CATEGORIES = {
 };
 
 // Preset shop items with scaling prices
-const SHOP_ITEMS = [
-    { id: 'ep30', name: 'Watch a 30 min episode', emoji: '📺', baseCost: 40, scaling: 10, scalingType: 'add' },
-    { id: 'ep45', name: 'Watch a 45 min episode', emoji: '📺', baseCost: 50, scaling: 10, scalingType: 'add' },
-    { id: 'ep60', name: 'Watch a 1 hour episode', emoji: '🎬', baseCost: 55, scaling: 10, scalingType: 'add' },
-    { id: 'read', name: 'Read (book, article, etc.)', emoji: '📖', baseCost: 1, scaling: 2, scalingType: 'multiply' }
-];
+// Shop items are now user-created only (no presets)
+const SHOP_ITEMS = [];
 
 // Preset recurring tasks (added on first run)
 const PRESET_RECURRING_TASKS = [
@@ -456,7 +452,6 @@ function renderAll() {
     renderStats();
     renderHistory();
     updateCoinDisplay();
-    updateStreakDisplay();
 }
 
 // Key Management UI
@@ -529,13 +524,7 @@ function updateCoinDisplay() {
     document.querySelector('.coin-amount').textContent = appData.stats.currentBalance;
 }
 
-// Update streak display
-function updateStreakDisplay() {
-    const streakText = appData.stats.currentStreak === 1
-        ? '1 day streak'
-        : `${appData.stats.currentStreak} day streak`;
-    document.querySelector('.streak-text').textContent = streakText;
-}
+
 
 // ============= TASKS =============
 
@@ -863,7 +852,6 @@ function toggleTask(id) {
     appData.stats.totalCoinsEarned += coins;
     appData.stats.currentBalance += coins;
     incrementTaskCount(task.difficulty);
-    updateStreak();
 
     // Move to completed history
     appData.completedHistory.unshift(task);
@@ -944,7 +932,6 @@ function toggleRecurringTask(id) {
         appData.stats.currentBalance += coins;
         incrementTaskCount(task.difficulty);
         appData.recurringCompletions[id] = today;
-        updateStreak();
 
         // Log to completedHistory for permanent record
         appData.completedHistory.unshift({
@@ -1531,47 +1518,13 @@ function renderStats() {
 
     // Rewards claimed
     document.getElementById('statRewardsClaimed').textContent = stats.rewardsClaimed;
-}
 
-// ============= STREAK =============
 
-function updateStreak() {
-    const today = new Date().toDateString();
-    const lastActive = appData.stats.lastActiveDate;
-
-    if (!lastActive) {
-        // First activity
-        appData.stats.currentStreak = 1;
-        appData.stats.bestStreak = 1;
-    } else {
-        const lastDate = new Date(lastActive).toDateString();
-        const yesterday = new Date(Date.now() - 86400000).toDateString();
-
-        if (lastDate === today) {
-            // Same day, no change
-        } else if (lastDate === yesterday) {
-            // Consecutive day
-            appData.stats.currentStreak++;
-            if (appData.stats.currentStreak > appData.stats.bestStreak) {
-                appData.stats.bestStreak = appData.stats.currentStreak;
-            }
-        } else {
-            // Streak broken
-            appData.stats.currentStreak = 1;
-        }
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
-    appData.stats.lastActiveDate = new Date().toISOString();
-    updateStreakDisplay();
-}
-
-// ============= UTILITIES =============
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// Start the app
-init();
+    // Start the app
+    init();
