@@ -77,28 +77,11 @@ async function init() {
 
     console.log("Using Secret Key:", SECRET_KEY);
 
-    // Load cached data from localStorage for instant display
-    const cacheKey = `brownbook_cache_${SECRET_KEY}`;
-    const cachedData = localStorage.getItem(cacheKey);
-    if (cachedData) {
-        try {
-            const parsed = JSON.parse(cachedData);
-            appData = { ...appData, ...parsed };
-            renderAll(); // Instant render from cache
-            console.log("Loaded from cache");
-        } catch (e) {
-            console.warn("Cache parse error, waiting for Firebase");
-        }
-    }
-
     // Listen for real-time updates from Cloud Firestore
     onSnapshot(DATA_DOC_REF, (doc) => {
         if (doc.exists()) {
             const data = doc.data();
             appData = { ...appData, ...data }; // Merge with defaults
-
-            // Save to localStorage for next load
-            localStorage.setItem(cacheKey, JSON.stringify(appData));
 
             // Show sync indicator
             const syncStatus = document.getElementById('syncStatus');
