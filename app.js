@@ -121,6 +121,12 @@ async function init() {
             renderAll();
         }
     });
+
+    // Auto-refresh every minute for timer updates and expired task cleanup
+    setInterval(() => {
+        cleanupExpiredTasks(); // Delete any newly expired tasks
+        renderTasks(); // Update countdown timers
+    }, 60000); // 60,000ms = 1 minute
 }
 
 function addPresets() {
