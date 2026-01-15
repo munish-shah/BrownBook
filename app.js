@@ -98,7 +98,10 @@ async function init() {
             // Always show import button to allow data restoration/migration
             document.getElementById('importDataBtn').style.display = 'block';
 
-            // Run migration/cleanup on first load
+            // Always clean up expired tasks on every load/sync
+            cleanupExpiredTasks();
+
+            // Run other migrations/cleanup only on first load
             if (isFirstLoad) {
                 runMigrationsAndCleanup();
                 isFirstLoad = false;
@@ -134,6 +137,18 @@ function addPresets() {
     saveData();
 }
 
+// Clean up expired tasks - runs on every sync
+async function cleanupExpiredTasks() {
+    const now = new Date();
+    const expiredTasks = appData.tasks.filter(t => t.expiresAt && new Date(t.expiresAt) <= now);
+
+    if (expiredTasks.length > 0) {
+        appData.tasks = appData.tasks.filter(t => !t.expiresAt || new Date(t.expiresAt) > now);
+        console.log(`Removed ${expiredTasks.length} expired task(s):`, expiredTasks.map(t => t.title));
+        await saveData();
+    }
+}
+
 async function runMigrationsAndCleanup() {
     let needsSave = false;
 
@@ -149,15 +164,6 @@ async function runMigrationsAndCleanup() {
     if (completedInTasks.length > 0) {
         appData.completedHistory = [...completedInTasks, ...appData.completedHistory];
         appData.tasks = appData.tasks.filter(t => !t.completed);
-        needsSave = true;
-    }
-
-    // Delete expired tasks (uncompleted tasks past their expiration)
-    const now = new Date();
-    const expiredCount = appData.tasks.filter(t => t.expiresAt && new Date(t.expiresAt) <= now).length;
-    if (expiredCount > 0) {
-        appData.tasks = appData.tasks.filter(t => !t.expiresAt || new Date(t.expiresAt) > now);
-        console.log(`Removed ${expiredCount} expired task(s).`);
         needsSave = true;
     }
 
