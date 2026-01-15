@@ -1149,8 +1149,10 @@ function getTimeUntilReset() {
 function renderRewards() {
     const container = document.getElementById('rewardsGrid');
 
-    // Combine preset and custom shop items
-    const allShopItems = [...SHOP_ITEMS, ...appData.customShopItems];
+    // Combine preset and custom shop items, filtering out hidden presets
+    const hiddenIds = appData.hiddenShopItems || [];
+    const visiblePresets = SHOP_ITEMS.filter(item => !hiddenIds.includes(item.id));
+    const allShopItems = [...visiblePresets, ...appData.customShopItems];
 
     // Build shop items HTML
     let shopHTML = `
@@ -1241,7 +1243,7 @@ function createShopItemCard(item) {
             <button class="shop-claim-btn ${canAfford ? 'can-claim' : 'cannot-claim'}" data-id="${item.id}" ${!canAfford ? 'disabled' : ''}>
                 ${canAfford ? 'Claim' : `Need ${currentPrice}`}
             </button>
-            ${isCustom ? `<button class="shop-delete-btn" data-id="${item.id}">🗑</button>` : ''}
+            <button class="shop-delete-btn" data-id="${item.id}">🗑</button>
         </div>
     `;
 }
@@ -1409,9 +1411,21 @@ function openShopClaimModal(itemId) {
     document.getElementById('claimModal').classList.add('open');
 }
 
-// Delete custom shop item
+// Delete shop item (works for both custom and preset items)
 function deleteShopItem(itemId) {
-    appData.customShopItems = appData.customShopItems.filter(i => i.id !== itemId);
+    // Check if it's a custom item
+    const isCustom = appData.customShopItems.some(i => i.id === itemId);
+
+    if (isCustom) {
+        appData.customShopItems = appData.customShopItems.filter(i => i.id !== itemId);
+    } else {
+        // It's a preset item - add to hidden list
+        if (!appData.hiddenShopItems) appData.hiddenShopItems = [];
+        if (!appData.hiddenShopItems.includes(itemId)) {
+            appData.hiddenShopItems.push(itemId);
+        }
+    }
+
     saveData();
     renderRewards();
 }
