@@ -521,7 +521,14 @@ function setupKeyManagement() {
 
 // Update coin display in sidebar
 function updateCoinDisplay() {
-    document.querySelector('.coin-amount').textContent = appData.stats.currentBalance;
+    const balance = appData.stats.currentBalance;
+    console.log("Updating coin display to:", balance);
+    const el = document.querySelector('.coin-amount');
+    if (el) {
+        el.textContent = balance;
+    } else {
+        console.error("Could not find .coin-amount element!");
+    }
 }
 
 
