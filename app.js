@@ -1503,10 +1503,6 @@ function renderStats() {
         stats.tasksCompletedMedium + stats.tasksCompletedHard + stats.tasksCompletedEpic;
     document.getElementById('statTasksDone').textContent = totalTasks;
 
-    // Streaks
-    document.getElementById('statCurrentStreak').textContent = stats.currentStreak;
-    document.getElementById('statBestStreak').textContent = stats.bestStreak;
-
     // Difficulty breakdown
     const diffStats = document.getElementById('difficultyStats');
     diffStats.innerHTML = Object.entries(DIFFICULTIES).map(([key, diff]) => {
