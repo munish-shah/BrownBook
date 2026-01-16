@@ -1590,26 +1590,17 @@ function renderProgress() {
         return;
     }
 
-    // Render chart bars
-    const maxHeight = 160; // pixels
-    const barsHTML = data.map(d => {
-        const height = Math.max(4, (d.rate / 100) * maxHeight);
-        const colorClass = d.rate >= 80 ? 'high' : d.rate >= 50 ? 'medium' : 'low';
-        return `
-            <div class="chart-bar">
-                <div class="bar-value">${d.rate}%</div>
-                <div class="bar-fill ${colorClass}" style="height: ${height}px;"></div>
-                <div class="bar-label">${d.label}</div>
-            </div>
-        `;
-    }).join('');
-
-    chartContainer.innerHTML = `<div class="chart-bars">${barsHTML}</div>`;
+    // Render line chart
+    const chartHTML = renderLineChart(data);
+    chartContainer.innerHTML = chartHTML;
 
     // Render summary
     const avgRate = Math.round(data.reduce((sum, d) => sum + d.rate, 0) / data.length);
     const avgClass = avgRate >= 80 ? 'good' : avgRate >= 50 ? 'okay' : 'poor';
-    const bestDay = data.reduce((best, d) => d.rate > best.rate ? d : best, data[0]);
+    const bestItem = data.reduce((best, d) => d.rate > best.rate ? d : best, data[0]);
+    const periodLabel = progressState.range === 'daily' ? 'Day' :
+        progressState.range === 'weekly' ? 'Week' :
+            progressState.range === 'monthly' ? 'Month' : 'Year';
 
     summaryContainer.innerHTML = `
         <div class="summary-card">
@@ -1617,8 +1608,8 @@ function renderProgress() {
             <div class="summary-label">Average Consistency</div>
         </div>
         <div class="summary-card">
-            <div class="summary-value">${bestDay.label}</div>
-            <div class="summary-label">Best ${progressState.range === 'daily' ? 'Day' : progressState.range === 'weekly' ? 'Week' : 'Month'}</div>
+            <div class="summary-value">${bestItem.label}</div>
+            <div class="summary-label">Best ${periodLabel}</div>
         </div>
         <div class="summary-card">
             <div class="summary-value">${appData.recurringTasks.length}</div>
@@ -1627,10 +1618,105 @@ function renderProgress() {
     `;
 }
 
+function renderLineChart(data) {
+    const width = 100; // percentage
+    const height = 160;
+    const padding = { left: 30, right: 10, top: 20, bottom: 10 };
+    const chartWidth = 100 - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+
+    // Calculate points
+    const points = data.map((d, i) => {
+        const x = padding.left + (i / (data.length - 1 || 1)) * chartWidth;
+        const y = padding.top + chartHeight - (d.rate / 100) * chartHeight;
+        return { x, y, rate: d.rate, label: d.label };
+    });
+
+    // Create SVG path for the line
+    let linePath = '';
+    let areaPath = '';
+    if (points.length > 0) {
+        linePath = `M ${points[0].x} ${points[0].y}`;
+        areaPath = `M ${points[0].x} ${padding.top + chartHeight}`;
+        areaPath += ` L ${points[0].x} ${points[0].y}`;
+
+        for (let i = 1; i < points.length; i++) {
+            linePath += ` L ${points[i].x} ${points[i].y}`;
+            areaPath += ` L ${points[i].x} ${points[i].y}`;
+        }
+        areaPath += ` L ${points[points.length - 1].x} ${padding.top + chartHeight} Z`;
+    }
+
+    // Generate grid lines
+    const gridLines = [0, 25, 50, 75, 100].map(val => {
+        const y = padding.top + chartHeight - (val / 100) * chartHeight;
+        return `<line class="chart-grid-line" x1="${padding.left}%" y1="${y}" x2="${100 - padding.right}%" y2="${y}" />
+                <text class="chart-y-label" x="${padding.left - 2}%" y="${y + 3}" text-anchor="end">${val}</text>`;
+    }).join('');
+
+    // Generate points with values
+    const pointsHTML = points.map(p =>
+        `<circle class="chart-point" cx="${p.x}%" cy="${p.y}" r="4" data-rate="${p.rate}">
+            <title>${p.label}: ${p.rate}%</title>
+        </circle>`
+    ).join('');
+
+    // Generate labels
+    const labelsHTML = data.map((d, i) =>
+        `<div class="chart-label">${d.label}</div>`
+    ).join('');
+
+    return `
+        <div class="line-chart-wrapper">
+            <svg class="line-chart-svg" viewBox="0 0 100 ${height}" preserveAspectRatio="none">
+                <defs>
+                    <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color:#f5a623"/>
+                        <stop offset="100%" style="stop-color:#ffd93d"/>
+                    </linearGradient>
+                    <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" style="stop-color:#f5a623;stop-opacity:0.3"/>
+                        <stop offset="100%" style="stop-color:#f5a623;stop-opacity:0"/>
+                    </linearGradient>
+                </defs>
+                ${gridLines}
+                <path class="chart-area" d="${areaPath.replace(/%/g, '')}" vector-effect="non-scaling-stroke"/>
+                <path class="chart-line" d="${linePath.replace(/%/g, '')}" vector-effect="non-scaling-stroke"/>
+                ${pointsHTML.replace(/%/g, '')}
+            </svg>
+        </div>
+        <div class="chart-labels">${labelsHTML}</div>
+    `;
+}
+
+function getFirstUseDate() {
+    // Find the earliest date in completedHistory
+    let earliest = null;
+    appData.completedHistory.forEach(t => {
+        if (t.completedAt) {
+            const date = new Date(t.completedAt);
+            if (!earliest || date < earliest) {
+                earliest = date;
+            }
+        }
+    });
+    // Also check recurringTasks creation dates
+    appData.recurringTasks.forEach(t => {
+        if (t.createdAt) {
+            const date = new Date(t.createdAt);
+            if (!earliest || date < earliest) {
+                earliest = date;
+            }
+        }
+    });
+    return earliest || new Date();
+}
+
 function calculateRecurringConsistency(range) {
     const data = [];
     const now = new Date();
     const totalRecurring = appData.recurringTasks.length;
+    const firstUse = getFirstUseDate();
 
     if (totalRecurring === 0) return [];
 
@@ -1638,13 +1724,15 @@ function calculateRecurringConsistency(range) {
     const recurringHistory = appData.completedHistory.filter(t => t.isRecurring);
 
     if (range === 'daily') {
-        // Last 7 days
-        for (let i = 6; i >= 0; i--) {
+        // Last 7 days (or since first use, whichever is shorter)
+        const daysSinceFirstUse = Math.floor((now - firstUse) / (1000 * 60 * 60 * 24));
+        const daysToShow = Math.min(7, daysSinceFirstUse + 1);
+
+        for (let i = daysToShow - 1; i >= 0; i--) {
             const date = new Date(now);
             date.setDate(date.getDate() - i);
             const dateStr = getDateString(date);
 
-            // Count unique recurring tasks completed on this day
             const completedOnDay = new Set();
             recurringHistory.forEach(t => {
                 if (t.completedAt) {
@@ -1669,14 +1757,17 @@ function calculateRecurringConsistency(range) {
         for (let w = 3; w >= 0; w--) {
             const weekStart = new Date(now);
             weekStart.setDate(weekStart.getDate() - (w * 7) - weekStart.getDay());
-            const weekEnd = new Date(weekStart);
-            weekEnd.setDate(weekEnd.getDate() + 6);
 
-            // Count completions in this week (7 days * totalRecurring = max possible)
+            // Skip weeks before first use
+            if (weekStart < firstUse) continue;
+
             let completedCount = 0;
+            let daysInWeek = 0;
             for (let d = 0; d < 7; d++) {
                 const date = new Date(weekStart);
                 date.setDate(date.getDate() + d);
+                if (date < firstUse || date > now) continue;
+                daysInWeek++;
                 const dateStr = getDateString(date);
 
                 const completedOnDay = new Set();
@@ -1692,7 +1783,8 @@ function calculateRecurringConsistency(range) {
                 completedCount += completedOnDay.size;
             }
 
-            const maxPossible = 7 * totalRecurring;
+            if (daysInWeek === 0) continue;
+            const maxPossible = daysInWeek * totalRecurring;
             const rate = Math.round((completedCount / maxPossible) * 100);
             data.push({
                 label: w === 0 ? 'This Week' : w === 1 ? 'Last Week' : `${w}w ago`,
@@ -1701,15 +1793,22 @@ function calculateRecurringConsistency(range) {
             });
         }
     } else if (range === 'monthly') {
-        // Last 3 months
-        for (let m = 2; m >= 0; m--) {
+        // Last 6 months
+        for (let m = 5; m >= 0; m--) {
             const monthDate = new Date(now.getFullYear(), now.getMonth() - m, 1);
             const monthEnd = new Date(now.getFullYear(), now.getMonth() - m + 1, 0);
-            const daysInMonth = monthEnd.getDate();
 
+            // Skip months before first use
+            if (monthEnd < firstUse) continue;
+
+            const daysInMonth = monthEnd.getDate();
             let completedCount = 0;
+            let validDays = 0;
+
             for (let d = 1; d <= daysInMonth; d++) {
                 const date = new Date(monthDate.getFullYear(), monthDate.getMonth(), d);
+                if (date < firstUse || date > now) continue;
+                validDays++;
                 const dateStr = getDateString(date);
 
                 const completedOnDay = new Set();
@@ -1725,11 +1824,54 @@ function calculateRecurringConsistency(range) {
                 completedCount += completedOnDay.size;
             }
 
-            const maxPossible = daysInMonth * totalRecurring;
+            if (validDays === 0) continue;
+            const maxPossible = validDays * totalRecurring;
             const rate = Math.round((completedCount / maxPossible) * 100);
             const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
             data.push({
                 label: monthNames[monthDate.getMonth()],
+                rate: rate,
+                count: completedCount
+            });
+        }
+    } else if (range === 'yearly') {
+        // Show years since first use (up to 3 years back)
+        const currentYear = now.getFullYear();
+        const firstYear = firstUse.getFullYear();
+
+        for (let y = Math.max(firstYear, currentYear - 2); y <= currentYear; y++) {
+            let completedCount = 0;
+            let validDays = 0;
+
+            for (let m = 0; m < 12; m++) {
+                const monthEnd = new Date(y, m + 1, 0);
+                const daysInMonth = monthEnd.getDate();
+
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const date = new Date(y, m, d);
+                    if (date < firstUse || date > now) continue;
+                    validDays++;
+                    const dateStr = getDateString(date);
+
+                    const completedOnDay = new Set();
+                    recurringHistory.forEach(t => {
+                        if (t.completedAt) {
+                            const tDate = new Date(t.completedAt);
+                            if (tDate.getHours() < 6) tDate.setDate(tDate.getDate() - 1);
+                            if (getDateString(tDate) === dateStr && t.recurringId) {
+                                completedOnDay.add(t.recurringId);
+                            }
+                        }
+                    });
+                    completedCount += completedOnDay.size;
+                }
+            }
+
+            if (validDays === 0) continue;
+            const maxPossible = validDays * totalRecurring;
+            const rate = Math.round((completedCount / maxPossible) * 100);
+            data.push({
+                label: y.toString(),
                 rate: rate,
                 count: completedCount
             });
