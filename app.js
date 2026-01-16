@@ -1621,11 +1621,12 @@ function renderProgress() {
 function renderBarChart(data) {
     const maxHeight = 140; // pixels
     const barsHTML = data.map(d => {
+        const roundedRate = Math.round(d.rate);
         const height = Math.max(4, (d.rate / 100) * maxHeight);
         const colorClass = d.rate >= 80 ? 'high' : d.rate >= 50 ? 'medium' : 'low';
         return `
             <div class="chart-bar">
-                <div class="bar-value">${d.rate}%</div>
+                <div class="bar-value">${roundedRate}%</div>
                 <div class="bar-fill-container">
                     <div class="bar-fill ${colorClass}" style="height: ${height}px;"></div>
                 </div>
@@ -1692,11 +1693,12 @@ function calculateRecurringConsistency(range) {
                 }
             });
 
-            const rate = Math.round((completedOnDay.size / totalRecurring) * 100);
+            // Store raw rate (unrounded) for consistent averaging
+            const rate = (completedOnDay.size / totalRecurring) * 100;
             const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
             data.push({
                 label: i === 0 ? 'Today' : i === 1 ? 'Yest' : dayNames[date.getDay()],
-                rate: rate,
+                rate: rate, // raw value
                 count: completedOnDay.size
             });
         }
@@ -1732,7 +1734,7 @@ function calculateRecurringConsistency(range) {
 
             if (daysInWeek === 0) continue;
             const maxPossible = daysInWeek * totalRecurring;
-            const rate = Math.round((completedCount / maxPossible) * 100);
+            const rate = (completedCount / maxPossible) * 100;
             data.push({
                 label: w === 0 ? 'This Week' : w === 1 ? 'Last Week' : `${w}w ago`,
                 rate: rate,
@@ -1773,7 +1775,7 @@ function calculateRecurringConsistency(range) {
 
             if (validDays === 0) continue;
             const maxPossible = validDays * totalRecurring;
-            const rate = Math.round((completedCount / maxPossible) * 100);
+            const rate = (completedCount / maxPossible) * 100;
             const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
             data.push({
                 label: monthNames[monthDate.getMonth()],
@@ -1816,7 +1818,7 @@ function calculateRecurringConsistency(range) {
 
             if (validDays === 0) continue;
             const maxPossible = validDays * totalRecurring;
-            const rate = Math.round((completedCount / maxPossible) * 100);
+            const rate = (completedCount / maxPossible) * 100;
             data.push({
                 label: y.toString(),
                 rate: rate,
