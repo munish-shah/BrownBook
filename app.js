@@ -1627,14 +1627,20 @@ function renderBarChart(data) {
 
         // Build tooltip content if completedIds exists (daily view)
         let tooltipHTML = '';
-        if (d.completedIds) {
-            const taskList = appData.recurringTasks.map(task => {
-                const isCompleted = d.completedIds.includes(task.id);
-                const icon = isCompleted ? '✓' : '✗';
-                const className = isCompleted ? 'completed' : 'missed';
-                return `<div class="tooltip-task ${className}"><span class="tooltip-icon">${icon}</span>${escapeHtml(task.title)}</div>`;
-            }).join('');
-            tooltipHTML = `<div class="bar-tooltip">${taskList}</div>`;
+        if (d.completedIds && d.activeTaskIds) {
+            // Only show tasks that were scheduled for this day
+            const activeTasks = appData.recurringTasks.filter(t => d.activeTaskIds.includes(t.id));
+            if (activeTasks.length === 0) {
+                tooltipHTML = `<div class="bar-tooltip"><div class="tooltip-task">No tasks scheduled</div></div>`;
+            } else {
+                const taskList = activeTasks.map(task => {
+                    const isCompleted = d.completedIds.includes(task.id);
+                    const icon = isCompleted ? '✓' : '✗';
+                    const className = isCompleted ? 'completed' : 'missed';
+                    return `<div class="tooltip-task ${className}"><span class="tooltip-icon">${icon}</span>${escapeHtml(task.title)}</div>`;
+                }).join('');
+                tooltipHTML = `<div class="bar-tooltip">${taskList}</div>`;
+            }
         }
 
         return `
@@ -1675,6 +1681,35 @@ function getFirstUseDate() {
     return earliest || new Date();
 }
 
+// Check if a recurring task was scheduled to be active on a given date
+function isTaskActiveOnDate(task, date) {
+    // Daily tasks are always active
+    if (task.type === 'daily' || !task.type) {
+        return true;
+    }
+
+    // Interval tasks: check if date falls on active or break day
+    if (task.type === 'interval' && task.cycleStartDate) {
+        const cycleStart = new Date(task.cycleStartDate);
+        cycleStart.setHours(0, 0, 0, 0);
+
+        const checkDate = new Date(date);
+        checkDate.setHours(0, 0, 0, 0);
+
+        // Calculate days since cycle start
+        const daysDiff = Math.floor((checkDate - cycleStart) / (1000 * 60 * 60 * 24));
+        if (daysDiff < 0) return false; // Before task was created
+
+        const cycleLength = task.activeDays + task.breakDays;
+        const dayInCycle = daysDiff % cycleLength;
+
+        // Active if we're within the active portion of the cycle
+        return dayInCycle < task.activeDays;
+    }
+
+    return true;
+}
+
 function calculateRecurringConsistency(range) {
     const data = [];
     const now = new Date();
@@ -1696,25 +1731,34 @@ function calculateRecurringConsistency(range) {
             date.setDate(date.getDate() - i);
             const dateStr = getDateString(date);
 
+            // Get tasks that were ACTIVE on this day
+            const activeTasksOnDay = appData.recurringTasks.filter(task => isTaskActiveOnDate(task, date));
+            const activeTaskIds = activeTasksOnDay.map(t => t.id);
+
             const completedOnDay = new Set();
             recurringHistory.forEach(t => {
                 if (t.completedAt) {
                     const tDate = new Date(t.completedAt);
                     if (tDate.getHours() < 6) tDate.setDate(tDate.getDate() - 1);
                     if (getDateString(tDate) === dateStr && t.recurringId) {
-                        completedOnDay.add(t.recurringId);
+                        // Only count if this task was active on this day
+                        if (activeTaskIds.includes(t.recurringId)) {
+                            completedOnDay.add(t.recurringId);
+                        }
                     }
                 }
             });
 
-            // Store raw rate (unrounded) for consistent averaging
-            const rate = (completedOnDay.size / totalRecurring) * 100;
+            // Calculate rate based on tasks that were SUPPOSED to be done
+            const tasksExpected = activeTasksOnDay.length;
+            const rate = tasksExpected > 0 ? (completedOnDay.size / tasksExpected) * 100 : 100;
             const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
             data.push({
                 label: i === 0 ? 'Today' : i === 1 ? 'Yest' : dayNames[date.getDay()],
                 rate: rate,
                 count: completedOnDay.size,
-                completedIds: Array.from(completedOnDay) // Store which tasks were completed
+                completedIds: Array.from(completedOnDay),
+                activeTaskIds: activeTaskIds // Store which tasks were scheduled
             });
         }
     } else if (range === 'weekly') {
