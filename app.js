@@ -1624,13 +1624,27 @@ function renderBarChart(data) {
         const roundedRate = Math.round(d.rate);
         const height = Math.max(4, (d.rate / 100) * maxHeight);
         const colorClass = d.rate >= 80 ? 'high' : d.rate >= 50 ? 'medium' : 'low';
+
+        // Build tooltip content if completedIds exists (daily view)
+        let tooltipHTML = '';
+        if (d.completedIds) {
+            const taskList = appData.recurringTasks.map(task => {
+                const isCompleted = d.completedIds.includes(task.id);
+                const icon = isCompleted ? '✓' : '✗';
+                const className = isCompleted ? 'completed' : 'missed';
+                return `<div class="tooltip-task ${className}"><span class="tooltip-icon">${icon}</span>${escapeHtml(task.title)}</div>`;
+            }).join('');
+            tooltipHTML = `<div class="bar-tooltip">${taskList}</div>`;
+        }
+
         return `
-            <div class="chart-bar">
+            <div class="chart-bar" ${d.completedIds ? 'data-has-tooltip="true"' : ''}>
                 <div class="bar-value">${roundedRate}%</div>
                 <div class="bar-fill-container">
                     <div class="bar-fill ${colorClass}" style="height: ${height}px;"></div>
                 </div>
                 <div class="bar-label">${d.label}</div>
+                ${tooltipHTML}
             </div>
         `;
     }).join('');
@@ -1698,8 +1712,9 @@ function calculateRecurringConsistency(range) {
             const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
             data.push({
                 label: i === 0 ? 'Today' : i === 1 ? 'Yest' : dayNames[date.getDay()],
-                rate: rate, // raw value
-                count: completedOnDay.size
+                rate: rate,
+                count: completedOnDay.size,
+                completedIds: Array.from(completedOnDay) // Store which tasks were completed
             });
         }
     } else if (range === 'weekly') {
