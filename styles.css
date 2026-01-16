@@ -1494,6 +1494,213 @@ input[type="range"]::-webkit-slider-thumb {
     min-width: 140px;
 }
 
+/* ============= PROGRESS VIEW ============= */
+.progress-content {
+    padding: 24px;
+}
+
+/* Tab Switcher */
+.progress-tabs {
+    display: flex;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: var(--radius-full);
+    padding: 4px;
+    margin-bottom: 20px;
+    max-width: 300px;
+}
+
+.progress-tab {
+    flex: 1;
+    padding: 10px 16px;
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-full);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.progress-tab:hover {
+    color: var(--text-primary);
+}
+
+.progress-tab.active {
+    background: var(--card-bg);
+    color: var(--text-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Time Filters */
+.time-filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+}
+
+.time-filter {
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    border-radius: var(--radius-full);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.time-filter:hover {
+    border-color: var(--text-secondary);
+    color: var(--text-primary);
+}
+
+.time-filter.active {
+    background: var(--accent-warm);
+    border-color: var(--accent-warm);
+    color: white;
+}
+
+/* Chart Container */
+.chart-container {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    min-height: 280px;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-bars {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    height: 200px;
+    gap: 8px;
+    padding: 0 8px;
+}
+
+.chart-bar {
+    flex: 1;
+    max-width: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.bar-fill {
+    width: 100%;
+    background: linear-gradient(180deg, var(--accent-warm) 0%, var(--accent-gold) 100%);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    transition: height 0.4s ease-out;
+    min-height: 4px;
+}
+
+.bar-fill.low {
+    background: linear-gradient(180deg, #ff6b6b 0%, #ee5a5a 100%);
+}
+
+.bar-fill.medium {
+    background: linear-gradient(180deg, #ffd93d 0%, #f5a623 100%);
+}
+
+.bar-fill.high {
+    background: linear-gradient(180deg, #6bcb77 0%, #4ade80 100%);
+}
+
+.bar-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.bar-value {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Chart Empty State */
+.chart-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.chart-empty-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+/* Coming Soon State */
+.coming-soon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.coming-soon-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+}
+
+.coming-soon h3 {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+/* Progress Summary */
+.progress-summary {
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+}
+
+.summary-card {
+    background: var(--card-bg);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    text-align: center;
+}
+
+.summary-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+}
+
+.summary-value.good {
+    color: #4ade80;
+}
+
+.summary-value.okay {
+    color: #fbbf24;
+}
+
+.summary-value.poor {
+    color: #f87171;
+}
+
+.summary-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 6px;
+}
+
 /* ============= MOBILE RESPONSIVE ============= */
 @media (max-width: 768px) {
     .app-container {

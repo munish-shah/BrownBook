@@ -428,6 +428,24 @@ function setupEventListeners() {
     document.getElementById('rewardName').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') saveNewReward();
     });
+
+    // Progress view - Tab switcher (Recurring / Non-recurring)
+    document.querySelectorAll('.progress-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.progress-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            renderProgress();
+        });
+    });
+
+    // Progress view - Time filters (Daily / Weekly / Monthly)
+    document.querySelectorAll('.time-filter').forEach(filter => {
+        filter.addEventListener('click', () => {
+            document.querySelectorAll('.time-filter').forEach(f => f.classList.remove('active'));
+            filter.classList.add('active');
+            renderProgress();
+        });
+    });
 }
 
 // Tab navigation
@@ -442,6 +460,8 @@ function switchTab(tabName) {
         renderStats();
     } else if (tabName === 'history') {
         renderHistory();
+    } else if (tabName === 'progress') {
+        renderProgress();
     }
 }
 
@@ -451,6 +471,7 @@ function renderAll() {
     renderRewards();
     renderStats();
     renderHistory();
+    renderProgress();
     updateCoinDisplay();
 }
 
@@ -1521,6 +1542,208 @@ function renderStats() {
 
     // Rewards claimed
     document.getElementById('statRewardsClaimed').textContent = stats.rewardsClaimed;
+}
+
+// ============= PROGRESS =============
+
+// Current progress view state
+let progressState = {
+    type: 'recurring', // 'recurring' or 'nonrecurring'
+    range: 'daily' // 'daily', 'weekly', 'monthly'
+};
+
+function renderProgress() {
+    // Get current filter states from UI
+    const activeTab = document.querySelector('.progress-tab.active');
+    const activeFilter = document.querySelector('.time-filter.active');
+
+    progressState.type = activeTab ? activeTab.dataset.type : 'recurring';
+    progressState.range = activeFilter ? activeFilter.dataset.range : 'daily';
+
+    const chartContainer = document.getElementById('progressChart');
+    const summaryContainer = document.getElementById('progressSummary');
+
+    // Handle Non-recurring (Coming Soon)
+    if (progressState.type === 'nonrecurring') {
+        chartContainer.innerHTML = `
+            <div class="coming-soon">
+                <span class="coming-soon-icon">🚀</span>
+                <h3>Coming Soon</h3>
+                <p>Non-recurring task analytics are on the way!</p>
+            </div>
+        `;
+        summaryContainer.innerHTML = '';
+        return;
+    }
+
+    // Calculate recurring consistency data
+    const data = calculateRecurringConsistency(progressState.range);
+
+    if (data.length === 0) {
+        chartContainer.innerHTML = `
+            <div class="chart-empty">
+                <span class="chart-empty-icon">📊</span>
+                <p>No data yet. Complete some recurring tasks!</p>
+            </div>
+        `;
+        summaryContainer.innerHTML = '';
+        return;
+    }
+
+    // Render chart bars
+    const maxHeight = 160; // pixels
+    const barsHTML = data.map(d => {
+        const height = Math.max(4, (d.rate / 100) * maxHeight);
+        const colorClass = d.rate >= 80 ? 'high' : d.rate >= 50 ? 'medium' : 'low';
+        return `
+            <div class="chart-bar">
+                <div class="bar-value">${d.rate}%</div>
+                <div class="bar-fill ${colorClass}" style="height: ${height}px;"></div>
+                <div class="bar-label">${d.label}</div>
+            </div>
+        `;
+    }).join('');
+
+    chartContainer.innerHTML = `<div class="chart-bars">${barsHTML}</div>`;
+
+    // Render summary
+    const avgRate = Math.round(data.reduce((sum, d) => sum + d.rate, 0) / data.length);
+    const avgClass = avgRate >= 80 ? 'good' : avgRate >= 50 ? 'okay' : 'poor';
+    const bestDay = data.reduce((best, d) => d.rate > best.rate ? d : best, data[0]);
+
+    summaryContainer.innerHTML = `
+        <div class="summary-card">
+            <div class="summary-value ${avgClass}">${avgRate}%</div>
+            <div class="summary-label">Average Consistency</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-value">${bestDay.label}</div>
+            <div class="summary-label">Best ${progressState.range === 'daily' ? 'Day' : progressState.range === 'weekly' ? 'Week' : 'Month'}</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-value">${appData.recurringTasks.length}</div>
+            <div class="summary-label">Recurring Tasks</div>
+        </div>
+    `;
+}
+
+function calculateRecurringConsistency(range) {
+    const data = [];
+    const now = new Date();
+    const totalRecurring = appData.recurringTasks.length;
+
+    if (totalRecurring === 0) return [];
+
+    // Get all recurring completions from history
+    const recurringHistory = appData.completedHistory.filter(t => t.isRecurring);
+
+    if (range === 'daily') {
+        // Last 7 days
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date(now);
+            date.setDate(date.getDate() - i);
+            const dateStr = getDateString(date);
+
+            // Count unique recurring tasks completed on this day
+            const completedOnDay = new Set();
+            recurringHistory.forEach(t => {
+                if (t.completedAt) {
+                    const tDate = new Date(t.completedAt);
+                    if (tDate.getHours() < 6) tDate.setDate(tDate.getDate() - 1);
+                    if (getDateString(tDate) === dateStr && t.recurringId) {
+                        completedOnDay.add(t.recurringId);
+                    }
+                }
+            });
+
+            const rate = Math.round((completedOnDay.size / totalRecurring) * 100);
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            data.push({
+                label: i === 0 ? 'Today' : i === 1 ? 'Yest' : dayNames[date.getDay()],
+                rate: rate,
+                count: completedOnDay.size
+            });
+        }
+    } else if (range === 'weekly') {
+        // Last 4 weeks
+        for (let w = 3; w >= 0; w--) {
+            const weekStart = new Date(now);
+            weekStart.setDate(weekStart.getDate() - (w * 7) - weekStart.getDay());
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+
+            // Count completions in this week (7 days * totalRecurring = max possible)
+            let completedCount = 0;
+            for (let d = 0; d < 7; d++) {
+                const date = new Date(weekStart);
+                date.setDate(date.getDate() + d);
+                const dateStr = getDateString(date);
+
+                const completedOnDay = new Set();
+                recurringHistory.forEach(t => {
+                    if (t.completedAt) {
+                        const tDate = new Date(t.completedAt);
+                        if (tDate.getHours() < 6) tDate.setDate(tDate.getDate() - 1);
+                        if (getDateString(tDate) === dateStr && t.recurringId) {
+                            completedOnDay.add(t.recurringId);
+                        }
+                    }
+                });
+                completedCount += completedOnDay.size;
+            }
+
+            const maxPossible = 7 * totalRecurring;
+            const rate = Math.round((completedCount / maxPossible) * 100);
+            data.push({
+                label: w === 0 ? 'This Week' : w === 1 ? 'Last Week' : `${w}w ago`,
+                rate: rate,
+                count: completedCount
+            });
+        }
+    } else if (range === 'monthly') {
+        // Last 3 months
+        for (let m = 2; m >= 0; m--) {
+            const monthDate = new Date(now.getFullYear(), now.getMonth() - m, 1);
+            const monthEnd = new Date(now.getFullYear(), now.getMonth() - m + 1, 0);
+            const daysInMonth = monthEnd.getDate();
+
+            let completedCount = 0;
+            for (let d = 1; d <= daysInMonth; d++) {
+                const date = new Date(monthDate.getFullYear(), monthDate.getMonth(), d);
+                const dateStr = getDateString(date);
+
+                const completedOnDay = new Set();
+                recurringHistory.forEach(t => {
+                    if (t.completedAt) {
+                        const tDate = new Date(t.completedAt);
+                        if (tDate.getHours() < 6) tDate.setDate(tDate.getDate() - 1);
+                        if (getDateString(tDate) === dateStr && t.recurringId) {
+                            completedOnDay.add(t.recurringId);
+                        }
+                    }
+                });
+                completedCount += completedOnDay.size;
+            }
+
+            const maxPossible = daysInMonth * totalRecurring;
+            const rate = Math.round((completedCount / maxPossible) * 100);
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            data.push({
+                label: monthNames[monthDate.getMonth()],
+                rate: rate,
+                count: completedCount
+            });
+        }
+    }
+
+    return data;
+}
+
+function getDateString(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 // ============= UTILITIES =============

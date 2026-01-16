@@ -46,6 +46,10 @@
                     <span class="tab-icon">📊</span>
                     <span class="tab-label">Stats</span>
                 </button>
+                <button class="nav-tab" data-tab="progress">
+                    <span class="tab-icon">📈</span>
+                    <span class="tab-label">Progress</span>
+                </button>
                 <button class="nav-tab" data-tab="history">
                     <span class="tab-icon">📜</span>
                     <span class="tab-label">History</span>
@@ -163,6 +167,41 @@
                         <span class="claimed-icon">🎁</span>
                         <span class="claimed-number" id="statRewardsClaimed">0</span>
                         <span class="claimed-label">total rewards claimed</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress View -->
+            <div class="view" id="progressView">
+                <header class="view-header">
+                    <div class="header-info">
+                        <h1>Progress</h1>
+                        <p class="subtitle">Track your consistency over time</p>
+                    </div>
+                </header>
+
+                <div class="progress-content">
+                    <!-- Tab Switcher -->
+                    <div class="progress-tabs">
+                        <button class="progress-tab active" data-type="recurring">Recurring</button>
+                        <button class="progress-tab" data-type="nonrecurring">Non-recurring</button>
+                    </div>
+
+                    <!-- Time Filter -->
+                    <div class="time-filters">
+                        <button class="time-filter active" data-range="daily">Daily</button>
+                        <button class="time-filter" data-range="weekly">Weekly</button>
+                        <button class="time-filter" data-range="monthly">Monthly</button>
+                    </div>
+
+                    <!-- Chart Container -->
+                    <div class="chart-container" id="progressChart">
+                        <!-- Chart bars rendered by JS -->
+                    </div>
+
+                    <!-- Summary Stats -->
+                    <div class="progress-summary" id="progressSummary">
+                        <!-- Summary rendered by JS -->
                     </div>
                 </div>
             </div>
