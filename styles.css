@@ -1638,23 +1638,36 @@ input[type="range"]::-webkit-slider-thumb {
     fill: var(--text-muted);
 }
 
-/* Legacy bar styles (keeping for backwards compat) */
+/* Bar Chart Styles */
 .chart-bars {
     display: flex;
     align-items: flex-end;
     justify-content: space-around;
-    height: 200px;
-    gap: 8px;
-    padding: 0 8px;
+    height: 180px;
+    gap: 12px;
+    padding: 20px 16px 0 16px;
 }
 
 .chart-bar {
     flex: 1;
-    max-width: 40px;
+    max-width: 60px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+}
+
+.bar-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.bar-fill-container {
+    width: 100%;
+    height: 140px;
+    display: flex;
+    align-items: flex-end;
 }
 
 .bar-fill {

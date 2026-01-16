@@ -1590,8 +1590,8 @@ function renderProgress() {
         return;
     }
 
-    // Render line chart
-    const chartHTML = renderLineChart(data);
+    // Render bar chart
+    const chartHTML = renderBarChart(data);
     chartContainer.innerHTML = chartHTML;
 
     // Render summary
@@ -1618,75 +1618,23 @@ function renderProgress() {
     `;
 }
 
-function renderLineChart(data) {
-    const width = 100; // percentage
-    const height = 160;
-    const padding = { left: 30, right: 10, top: 20, bottom: 10 };
-    const chartWidth = 100 - padding.left - padding.right;
-    const chartHeight = height - padding.top - padding.bottom;
-
-    // Calculate points
-    const points = data.map((d, i) => {
-        const x = padding.left + (i / (data.length - 1 || 1)) * chartWidth;
-        const y = padding.top + chartHeight - (d.rate / 100) * chartHeight;
-        return { x, y, rate: d.rate, label: d.label };
-    });
-
-    // Create SVG path for the line
-    let linePath = '';
-    let areaPath = '';
-    if (points.length > 0) {
-        linePath = `M ${points[0].x} ${points[0].y}`;
-        areaPath = `M ${points[0].x} ${padding.top + chartHeight}`;
-        areaPath += ` L ${points[0].x} ${points[0].y}`;
-
-        for (let i = 1; i < points.length; i++) {
-            linePath += ` L ${points[i].x} ${points[i].y}`;
-            areaPath += ` L ${points[i].x} ${points[i].y}`;
-        }
-        areaPath += ` L ${points[points.length - 1].x} ${padding.top + chartHeight} Z`;
-    }
-
-    // Generate grid lines
-    const gridLines = [0, 25, 50, 75, 100].map(val => {
-        const y = padding.top + chartHeight - (val / 100) * chartHeight;
-        return `<line class="chart-grid-line" x1="${padding.left}%" y1="${y}" x2="${100 - padding.right}%" y2="${y}" />
-                <text class="chart-y-label" x="${padding.left - 2}%" y="${y + 3}" text-anchor="end">${val}</text>`;
+function renderBarChart(data) {
+    const maxHeight = 140; // pixels
+    const barsHTML = data.map(d => {
+        const height = Math.max(4, (d.rate / 100) * maxHeight);
+        const colorClass = d.rate >= 80 ? 'high' : d.rate >= 50 ? 'medium' : 'low';
+        return `
+            <div class="chart-bar">
+                <div class="bar-value">${d.rate}%</div>
+                <div class="bar-fill-container">
+                    <div class="bar-fill ${colorClass}" style="height: ${height}px;"></div>
+                </div>
+                <div class="bar-label">${d.label}</div>
+            </div>
+        `;
     }).join('');
 
-    // Generate points with values
-    const pointsHTML = points.map(p =>
-        `<circle class="chart-point" cx="${p.x}%" cy="${p.y}" r="4" data-rate="${p.rate}">
-            <title>${p.label}: ${p.rate}%</title>
-        </circle>`
-    ).join('');
-
-    // Generate labels
-    const labelsHTML = data.map((d, i) =>
-        `<div class="chart-label">${d.label}</div>`
-    ).join('');
-
-    return `
-        <div class="line-chart-wrapper">
-            <svg class="line-chart-svg" viewBox="0 0 100 ${height}" preserveAspectRatio="none">
-                <defs>
-                    <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" style="stop-color:#f5a623"/>
-                        <stop offset="100%" style="stop-color:#ffd93d"/>
-                    </linearGradient>
-                    <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" style="stop-color:#f5a623;stop-opacity:0.3"/>
-                        <stop offset="100%" style="stop-color:#f5a623;stop-opacity:0"/>
-                    </linearGradient>
-                </defs>
-                ${gridLines}
-                <path class="chart-area" d="${areaPath.replace(/%/g, '')}" vector-effect="non-scaling-stroke"/>
-                <path class="chart-line" d="${linePath.replace(/%/g, '')}" vector-effect="non-scaling-stroke"/>
-                ${pointsHTML.replace(/%/g, '')}
-            </svg>
-        </div>
-        <div class="chart-labels">${labelsHTML}</div>
-    `;
+    return `<div class="chart-bars">${barsHTML}</div>`;
 }
 
 function getFirstUseDate() {
@@ -1758,8 +1706,7 @@ function calculateRecurringConsistency(range) {
             const weekStart = new Date(now);
             weekStart.setDate(weekStart.getDate() - (w * 7) - weekStart.getDay());
 
-            // Skip weeks before first use
-            if (weekStart < firstUse) continue;
+            // Don't skip early - let the inner loop filter days
 
             let completedCount = 0;
             let daysInWeek = 0;
