@@ -1594,8 +1594,10 @@ function renderProgress() {
     const chartHTML = renderBarChart(data);
     chartContainer.innerHTML = chartHTML;
 
-    // Render summary
-    const avgRate = Math.round(data.reduce((sum, d) => sum + d.rate, 0) / data.length);
+    // Render summary - calculate from totals for consistency
+    const totalCompleted = data.reduce((sum, d) => sum + d.count, 0);
+    const totalExpected = data.reduce((sum, d) => sum + d.expected, 0);
+    const avgRate = totalExpected > 0 ? Math.round((totalCompleted / totalExpected) * 100) : 0;
     const avgClass = avgRate >= 80 ? 'good' : avgRate >= 50 ? 'okay' : 'poor';
     const bestItem = data.reduce((best, d) => d.rate > best.rate ? d : best, data[0]);
     const periodLabel = progressState.range === 'daily' ? 'Day' :
@@ -1770,8 +1772,9 @@ function calculateRecurringConsistency(range) {
                 label: i === 0 ? 'Today' : i === 1 ? 'Yest' : dayNames[date.getDay()],
                 rate: rate,
                 count: completedOnDay.size,
+                expected: tasksExpected,
                 completedIds: Array.from(completedOnDay),
-                activeTaskIds: activeTaskIds // Store which tasks were scheduled
+                activeTaskIds: activeTaskIds
             });
         }
     } else if (range === 'weekly') {
@@ -1814,7 +1817,8 @@ function calculateRecurringConsistency(range) {
             data.push({
                 label: w === 0 ? 'This Week' : w === 1 ? 'Last Week' : `${w}w ago`,
                 rate: rate,
-                count: completedCount
+                count: completedCount,
+                expected: tasksExpectedTotal
             });
         }
     } else if (range === 'monthly') {
@@ -1861,7 +1865,8 @@ function calculateRecurringConsistency(range) {
             data.push({
                 label: monthNames[monthDate.getMonth()],
                 rate: rate,
-                count: completedCount
+                count: completedCount,
+                expected: tasksExpectedTotal
             });
         }
     } else if (range === 'yearly') {
@@ -1908,7 +1913,8 @@ function calculateRecurringConsistency(range) {
             data.push({
                 label: y.toString(),
                 rate: rate,
-                count: completedCount
+                count: completedCount,
+                expected: tasksExpectedTotal
             });
         }
     }
