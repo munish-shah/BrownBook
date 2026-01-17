@@ -1683,7 +1683,19 @@ function getFirstUseDate() {
 
 // Check if a recurring task was scheduled to be active on a given date
 function isTaskActiveOnDate(task, date) {
-    // Daily tasks are always active
+    const checkDate = new Date(date);
+    checkDate.setHours(0, 0, 0, 0);
+
+    // Task didn't exist yet on this date
+    if (task.createdAt) {
+        const createdDate = new Date(task.createdAt);
+        createdDate.setHours(0, 0, 0, 0);
+        if (checkDate < createdDate) {
+            return false;
+        }
+    }
+
+    // Daily tasks are always active (if they existed)
     if (task.type === 'daily' || !task.type) {
         return true;
     }
@@ -1693,12 +1705,9 @@ function isTaskActiveOnDate(task, date) {
         const cycleStart = new Date(task.cycleStartDate);
         cycleStart.setHours(0, 0, 0, 0);
 
-        const checkDate = new Date(date);
-        checkDate.setHours(0, 0, 0, 0);
-
         // Calculate days since cycle start
         const daysDiff = Math.floor((checkDate - cycleStart) / (1000 * 60 * 60 * 24));
-        if (daysDiff < 0) return false; // Before task was created
+        if (daysDiff < 0) return false; // Before cycle started
 
         const cycleLength = task.activeDays + task.breakDays;
         const dayInCycle = daysDiff % cycleLength;
