@@ -1760,7 +1760,11 @@ function calculateRecurringConsistency(range) {
 
             // Calculate rate based on tasks that were SUPPOSED to be done
             const tasksExpected = activeTasksOnDay.length;
-            const rate = tasksExpected > 0 ? (completedOnDay.size / tasksExpected) * 100 : 100;
+
+            // Skip days with no tasks scheduled (don't inflate average)
+            if (tasksExpected === 0) continue;
+
+            const rate = (completedOnDay.size / tasksExpected) * 100;
             const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
             data.push({
                 label: i === 0 ? 'Today' : i === 1 ? 'Yest' : dayNames[date.getDay()],
