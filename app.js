@@ -1780,16 +1780,19 @@ function calculateRecurringConsistency(range) {
             const weekStart = new Date(now);
             weekStart.setDate(weekStart.getDate() - (w * 7) - weekStart.getDay());
 
-            // Don't skip early - let the inner loop filter days
-
             let completedCount = 0;
-            let daysInWeek = 0;
+            let tasksExpectedTotal = 0;
+
             for (let d = 0; d < 7; d++) {
                 const date = new Date(weekStart);
                 date.setDate(date.getDate() + d);
                 if (date < firstUse || date > now) continue;
-                daysInWeek++;
                 const dateStr = getDateString(date);
+
+                // Get tasks that were ACTIVE on this day
+                const activeTasksOnDay = appData.recurringTasks.filter(task => isTaskActiveOnDate(task, date));
+                tasksExpectedTotal += activeTasksOnDay.length;
+                const activeTaskIds = activeTasksOnDay.map(t => t.id);
 
                 const completedOnDay = new Set();
                 recurringHistory.forEach(t => {
@@ -1797,16 +1800,17 @@ function calculateRecurringConsistency(range) {
                         const tDate = new Date(t.completedAt);
                         if (tDate.getHours() < 6) tDate.setDate(tDate.getDate() - 1);
                         if (getDateString(tDate) === dateStr && t.recurringId) {
-                            completedOnDay.add(t.recurringId);
+                            if (activeTaskIds.includes(t.recurringId)) {
+                                completedOnDay.add(t.recurringId);
+                            }
                         }
                     }
                 });
                 completedCount += completedOnDay.size;
             }
 
-            if (daysInWeek === 0) continue;
-            const maxPossible = daysInWeek * totalRecurring;
-            const rate = (completedCount / maxPossible) * 100;
+            if (tasksExpectedTotal === 0) continue;
+            const rate = (completedCount / tasksExpectedTotal) * 100;
             data.push({
                 label: w === 0 ? 'This Week' : w === 1 ? 'Last Week' : `${w}w ago`,
                 rate: rate,
@@ -1824,13 +1828,17 @@ function calculateRecurringConsistency(range) {
 
             const daysInMonth = monthEnd.getDate();
             let completedCount = 0;
-            let validDays = 0;
+            let tasksExpectedTotal = 0;
 
             for (let d = 1; d <= daysInMonth; d++) {
                 const date = new Date(monthDate.getFullYear(), monthDate.getMonth(), d);
                 if (date < firstUse || date > now) continue;
-                validDays++;
                 const dateStr = getDateString(date);
+
+                // Get tasks that were ACTIVE on this day
+                const activeTasksOnDay = appData.recurringTasks.filter(task => isTaskActiveOnDate(task, date));
+                tasksExpectedTotal += activeTasksOnDay.length;
+                const activeTaskIds = activeTasksOnDay.map(t => t.id);
 
                 const completedOnDay = new Set();
                 recurringHistory.forEach(t => {
@@ -1838,16 +1846,17 @@ function calculateRecurringConsistency(range) {
                         const tDate = new Date(t.completedAt);
                         if (tDate.getHours() < 6) tDate.setDate(tDate.getDate() - 1);
                         if (getDateString(tDate) === dateStr && t.recurringId) {
-                            completedOnDay.add(t.recurringId);
+                            if (activeTaskIds.includes(t.recurringId)) {
+                                completedOnDay.add(t.recurringId);
+                            }
                         }
                     }
                 });
                 completedCount += completedOnDay.size;
             }
 
-            if (validDays === 0) continue;
-            const maxPossible = validDays * totalRecurring;
-            const rate = (completedCount / maxPossible) * 100;
+            if (tasksExpectedTotal === 0) continue;
+            const rate = (completedCount / tasksExpectedTotal) * 100;
             const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
             data.push({
                 label: monthNames[monthDate.getMonth()],
@@ -1862,7 +1871,7 @@ function calculateRecurringConsistency(range) {
 
         for (let y = Math.max(firstYear, currentYear - 2); y <= currentYear; y++) {
             let completedCount = 0;
-            let validDays = 0;
+            let tasksExpectedTotal = 0;
 
             for (let m = 0; m < 12; m++) {
                 const monthEnd = new Date(y, m + 1, 0);
@@ -1871,8 +1880,12 @@ function calculateRecurringConsistency(range) {
                 for (let d = 1; d <= daysInMonth; d++) {
                     const date = new Date(y, m, d);
                     if (date < firstUse || date > now) continue;
-                    validDays++;
                     const dateStr = getDateString(date);
+
+                    // Get tasks that were ACTIVE on this day
+                    const activeTasksOnDay = appData.recurringTasks.filter(task => isTaskActiveOnDate(task, date));
+                    tasksExpectedTotal += activeTasksOnDay.length;
+                    const activeTaskIds = activeTasksOnDay.map(t => t.id);
 
                     const completedOnDay = new Set();
                     recurringHistory.forEach(t => {
@@ -1880,7 +1893,9 @@ function calculateRecurringConsistency(range) {
                             const tDate = new Date(t.completedAt);
                             if (tDate.getHours() < 6) tDate.setDate(tDate.getDate() - 1);
                             if (getDateString(tDate) === dateStr && t.recurringId) {
-                                completedOnDay.add(t.recurringId);
+                                if (activeTaskIds.includes(t.recurringId)) {
+                                    completedOnDay.add(t.recurringId);
+                                }
                             }
                         }
                     });
@@ -1888,9 +1903,8 @@ function calculateRecurringConsistency(range) {
                 }
             }
 
-            if (validDays === 0) continue;
-            const maxPossible = validDays * totalRecurring;
-            const rate = (completedCount / maxPossible) * 100;
+            if (tasksExpectedTotal === 0) continue;
+            const rate = (completedCount / tasksExpectedTotal) * 100;
             data.push({
                 label: y.toString(),
                 rate: rate,
