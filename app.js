@@ -1781,8 +1781,7 @@ function calculateRecurringConsistency(range) {
             const weekStart = new Date(now);
             weekStart.setDate(weekStart.getDate() - (w * 7) - weekStart.getDay());
 
-            let completedCount = 0;
-            let tasksExpectedTotal = 0;
+            let dailyRates = [];
 
             for (let d = 0; d < 7; d++) {
                 const date = new Date(weekStart);
@@ -1792,7 +1791,8 @@ function calculateRecurringConsistency(range) {
 
                 // Get tasks that were ACTIVE on this day
                 const activeTasksOnDay = appData.recurringTasks.filter(task => isTaskActiveOnDate(task, date));
-                tasksExpectedTotal += activeTasksOnDay.length;
+                if (activeTasksOnDay.length === 0) continue;
+
                 const activeTaskIds = activeTasksOnDay.map(t => t.id);
 
                 const completedOnDay = new Set();
@@ -1807,16 +1807,18 @@ function calculateRecurringConsistency(range) {
                         }
                     }
                 });
-                completedCount += completedOnDay.size;
+
+                // Calculate this day's rate
+                dailyRates.push((completedOnDay.size / activeTasksOnDay.length) * 100);
             }
 
-            if (tasksExpectedTotal === 0) continue;
-            const rate = (completedCount / tasksExpectedTotal) * 100;
+            if (dailyRates.length === 0) continue;
+            // Average of daily rates (consistent with how daily view works)
+            const rate = dailyRates.reduce((sum, r) => sum + r, 0) / dailyRates.length;
             data.push({
                 label: w === 0 ? 'This Week' : w === 1 ? 'Last Week' : `${w}w ago`,
                 rate: rate,
-                count: completedCount,
-                expected: tasksExpectedTotal
+                daysCount: dailyRates.length
             });
         }
     } else if (range === 'monthly') {
@@ -1829,8 +1831,7 @@ function calculateRecurringConsistency(range) {
             if (monthEnd < firstUse) continue;
 
             const daysInMonth = monthEnd.getDate();
-            let completedCount = 0;
-            let tasksExpectedTotal = 0;
+            let dailyRates = [];
 
             for (let d = 1; d <= daysInMonth; d++) {
                 const date = new Date(monthDate.getFullYear(), monthDate.getMonth(), d);
@@ -1839,7 +1840,8 @@ function calculateRecurringConsistency(range) {
 
                 // Get tasks that were ACTIVE on this day
                 const activeTasksOnDay = appData.recurringTasks.filter(task => isTaskActiveOnDate(task, date));
-                tasksExpectedTotal += activeTasksOnDay.length;
+                if (activeTasksOnDay.length === 0) continue;
+
                 const activeTaskIds = activeTasksOnDay.map(t => t.id);
 
                 const completedOnDay = new Set();
@@ -1854,17 +1856,19 @@ function calculateRecurringConsistency(range) {
                         }
                     }
                 });
-                completedCount += completedOnDay.size;
+
+                // Calculate this day's rate
+                dailyRates.push((completedOnDay.size / activeTasksOnDay.length) * 100);
             }
 
-            if (tasksExpectedTotal === 0) continue;
-            const rate = (completedCount / tasksExpectedTotal) * 100;
+            if (dailyRates.length === 0) continue;
+            // Average of daily rates (consistent with how daily view works)
+            const rate = dailyRates.reduce((sum, r) => sum + r, 0) / dailyRates.length;
             const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
             data.push({
                 label: monthNames[monthDate.getMonth()],
                 rate: rate,
-                count: completedCount,
-                expected: tasksExpectedTotal
+                daysCount: dailyRates.length
             });
         }
     } else if (range === 'yearly') {
@@ -1873,8 +1877,7 @@ function calculateRecurringConsistency(range) {
         const firstYear = firstUse.getFullYear();
 
         for (let y = Math.max(firstYear, currentYear - 2); y <= currentYear; y++) {
-            let completedCount = 0;
-            let tasksExpectedTotal = 0;
+            let dailyRates = [];
 
             for (let m = 0; m < 12; m++) {
                 const monthEnd = new Date(y, m + 1, 0);
@@ -1887,7 +1890,8 @@ function calculateRecurringConsistency(range) {
 
                     // Get tasks that were ACTIVE on this day
                     const activeTasksOnDay = appData.recurringTasks.filter(task => isTaskActiveOnDate(task, date));
-                    tasksExpectedTotal += activeTasksOnDay.length;
+                    if (activeTasksOnDay.length === 0) continue;
+
                     const activeTaskIds = activeTasksOnDay.map(t => t.id);
 
                     const completedOnDay = new Set();
@@ -1902,17 +1906,19 @@ function calculateRecurringConsistency(range) {
                             }
                         }
                     });
-                    completedCount += completedOnDay.size;
+
+                    // Calculate this day's rate
+                    dailyRates.push((completedOnDay.size / activeTasksOnDay.length) * 100);
                 }
             }
 
-            if (tasksExpectedTotal === 0) continue;
-            const rate = (completedCount / tasksExpectedTotal) * 100;
+            if (dailyRates.length === 0) continue;
+            // Average of daily rates (consistent with how daily view works)
+            const rate = dailyRates.reduce((sum, r) => sum + r, 0) / dailyRates.length;
             data.push({
                 label: y.toString(),
                 rate: rate,
-                count: completedCount,
-                expected: tasksExpectedTotal
+                daysCount: dailyRates.length
             });
         }
     }
