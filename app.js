@@ -1597,6 +1597,8 @@ function renderProgress() {
     // Render summary - calculate from totals for consistency
     const totalCompleted = data.reduce((sum, d) => sum + d.count, 0);
     const totalExpected = data.reduce((sum, d) => sum + d.expected, 0);
+    console.log("Progress data:", data.map(d => ({ label: d.label, count: d.count, expected: d.expected, rate: d.rate })));
+    console.log("Totals:", { totalCompleted, totalExpected, avgRate: totalExpected > 0 ? (totalCompleted / totalExpected) * 100 : 0 });
     const avgRate = totalExpected > 0 ? Math.round((totalCompleted / totalExpected) * 100) : 0;
     const avgClass = avgRate >= 80 ? 'good' : avgRate >= 50 ? 'okay' : 'poor';
     const bestItem = data.reduce((best, d) => d.rate > best.rate ? d : best, data[0]);
