@@ -1069,6 +1069,63 @@ input[type="range"]::-webkit-slider-thumb {
     margin-bottom: 32px;
 }
 
+/* Weekend Sale Banner */
+.sale-banner {
+    background: linear-gradient(135deg, #ff6b6b 0%, #f5a623 50%, #ffd93d 100%);
+    color: #1a1a2e;
+    padding: 12px 20px;
+    border-radius: var(--radius-lg);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    font-weight: 700;
+    font-size: 16px;
+    animation: pulse-glow 2s ease-in-out infinite;
+    box-shadow: 0 4px 20px rgba(245, 166, 35, 0.4);
+}
+
+@keyframes pulse-glow {
+
+    0%,
+    100% {
+        box-shadow: 0 4px 20px rgba(245, 166, 35, 0.4);
+    }
+
+    50% {
+        box-shadow: 0 4px 30px rgba(245, 166, 35, 0.7);
+    }
+}
+
+.sale-icon {
+    font-size: 20px;
+}
+
+.sale-text {
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Sale Price Styling */
+.original-price {
+    text-decoration: line-through;
+    color: var(--text-muted);
+    font-size: 12px;
+    margin-right: 4px;
+}
+
+.sale-price {
+    color: #4ade80;
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.shop-item-card.on-sale {
+    border-color: rgba(245, 166, 35, 0.4);
+    box-shadow: 0 0 12px rgba(245, 166, 35, 0.15);
+}
+
 .shop-header {
     display: flex;
     justify-content: space-between;

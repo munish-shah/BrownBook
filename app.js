@@ -1121,23 +1121,49 @@ function getResetDateString() {
     return `${year}-${month}-${day}`;
 }
 
+// Check if weekend sale is active (6AM Saturday to 6AM Monday)
+function isWeekendSale() {
+    const now = new Date();
+    const day = now.getDay(); // 0=Sun, 6=Sat
+    const hour = now.getHours();
+
+    // Saturday 6AM onwards
+    if (day === 6 && hour >= 6) return true;
+    // All of Sunday
+    if (day === 0) return true;
+    // Monday before 6AM
+    if (day === 1 && hour < 6) return true;
+    return false;
+}
+
 // Get current price for a shop item
 function getShopItemPrice(item) {
     const resetDate = getResetDateString();
     const purchase = appData.shopPurchases[item.id];
+    const saleActive = isWeekendSale();
 
     if (!purchase || purchase.lastResetDate !== resetDate) {
-        // Reset or first time
+        // Reset or first time - apply 50% discount for multiplicative items during sale
+        if (saleActive && item.scalingType === 'multiply') {
+            return Math.max(1, Math.floor(item.baseCost * 0.5));
+        }
         return item.baseCost;
     }
 
     // Calculate price based on scaling type
     if (item.scalingType === 'multiply') {
         // Multiplicative: baseCost * scaling^count (e.g., 1 → 2 → 4 → 8)
-        return Math.round(item.baseCost * Math.pow(item.scaling, purchase.count));
+        let price = Math.round(item.baseCost * Math.pow(item.scaling, purchase.count));
+        // Weekend sale: 50% off final price
+        if (saleActive) {
+            price = Math.max(1, Math.floor(price * 0.5));
+        }
+        return price;
     } else {
         // Additive: baseCost + count*scaling (e.g., 40 → 50 → 60)
-        return item.baseCost + (purchase.count * item.scaling);
+        // Weekend sale: increment every 2 purchases instead of every 1
+        const effectiveCount = saleActive ? Math.floor(purchase.count / 2) : purchase.count;
+        return item.baseCost + (effectiveCount * item.scaling);
     }
 }
 
@@ -1163,21 +1189,32 @@ function getTimeUntilReset() {
 
 function renderRewards() {
     const container = document.getElementById('rewardsGrid');
+    const saleActive = isWeekendSale();
 
     // Combine preset and custom shop items, filtering out hidden presets
     const hiddenIds = appData.hiddenShopItems || [];
     const visiblePresets = SHOP_ITEMS.filter(item => !hiddenIds.includes(item.id));
     const allShopItems = [...visiblePresets, ...appData.customShopItems];
 
+    // Sale banner HTML
+    const saleBanner = saleActive ? `
+        <div class="sale-banner">
+            <span class="sale-icon">🎉</span>
+            <span class="sale-text">Weekend Sale - 50% Off!</span>
+            <span class="sale-icon">🎉</span>
+        </div>
+    ` : '';
+
     // Build shop items HTML
     let shopHTML = `
         <div class="shop-section">
+            ${saleBanner}
             <div class="shop-header">
                 <h3>📺 Daily Shop</h3>
                 <span class="reset-timer">Resets in ${getTimeUntilReset()}</span>
             </div>
             <div class="shop-items">
-                ${allShopItems.map(item => createShopItemCard(item)).join('')}
+                ${allShopItems.map(item => createShopItemCard(item, saleActive)).join('')}
             </div>
         </div>
     `;
@@ -1226,13 +1263,27 @@ function renderRewards() {
     });
 }
 
-function createShopItemCard(item) {
+function createShopItemCard(item, saleActive = false) {
     const currentPrice = getShopItemPrice(item);
     const canAfford = appData.stats.currentBalance >= currentPrice;
     const resetDate = getResetDateString();
     const purchase = appData.shopPurchases[item.id];
     const purchaseCount = (purchase && purchase.lastResetDate === resetDate) ? purchase.count : 0;
     const isCustom = item.isCustom || false;
+
+    // Calculate original price (without sale) for strikethrough display
+    let originalPrice = currentPrice;
+    if (saleActive) {
+        if (item.scalingType === 'multiply') {
+            // For multiplicative: original is 2x the sale price
+            originalPrice = purchaseCount === 0
+                ? item.baseCost
+                : Math.round(item.baseCost * Math.pow(item.scaling, purchaseCount));
+        } else {
+            // For additive: use full increment count
+            originalPrice = item.baseCost + (purchaseCount * item.scaling);
+        }
+    }
 
     // Build scaling info text
     let scalingInfo = '';
@@ -1244,14 +1295,19 @@ function createShopItemCard(item) {
         }
     }
 
+    // Price display with sale styling
+    const priceDisplay = saleActive && originalPrice !== currentPrice
+        ? `<span class="original-price">${originalPrice}</span> <span class="sale-price">${currentPrice}</span>`
+        : `<span class="price-amount ${canAfford ? '' : 'too-expensive'}">${currentPrice}</span>`;
+
     return `
-        <div class="shop-item-card ${canAfford ? '' : 'unaffordable'}" data-id="${item.id}">
+        <div class="shop-item-card ${canAfford ? '' : 'unaffordable'} ${saleActive ? 'on-sale' : ''}" data-id="${item.id}">
             <div class="shop-item-emoji">${item.emoji}</div>
             <div class="shop-item-info">
                 <div class="shop-item-name">${escapeHtml(item.name)}</div>
                 <div class="shop-item-price">
                     <span class="coin-icon">$</span>
-                    <span class="price-amount ${canAfford ? '' : 'too-expensive'}">${currentPrice}</span>
+                    ${priceDisplay}
                     ${scalingInfo}
                 </div>
             </div>
