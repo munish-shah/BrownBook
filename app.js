@@ -203,6 +203,16 @@ async function runMigrationsAndCleanup() {
         needsSave = true;
     }
 
+    // One-time refund for weekend sale implementation (Read reward overpayment)
+    if (!appData.stats.weekend_sale_refund_2026_01_18) {
+        const refundAmount = 36;
+        appData.stats.currentBalance += refundAmount;
+        appData.stats.weekend_sale_refund_2026_01_18 = true;
+        console.log(`Weekend sale refund applied: +${refundAmount} coins`);
+        alert(`🎉 Weekend Sale Refund!\n\nYou've been refunded ${refundAmount} coins for the Read reward purchases made before the sale logic was implemented.`);
+        needsSave = true;
+    }
+
     // Cleanup: Sync History with Recurrence State
     // If it's in history for TODAY but NOT in recurringCompletions, it means it was unchecked (but history delete failed).
     // So we should REMOVE it from History.
