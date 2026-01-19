@@ -213,6 +213,16 @@ async function runMigrationsAndCleanup() {
         needsSave = true;
     }
 
+    // Second refund for MLK day purchases (4 purchases at 1+2+3+4=10 instead of 1+1+2+2=6)
+    if (!appData.stats.mlk_day_refund_2026_01_19) {
+        const refundAmount = 4;
+        appData.stats.currentBalance += refundAmount;
+        appData.stats.mlk_day_refund_2026_01_19 = true;
+        console.log(`MLK day refund applied: +${refundAmount} coins`);
+        alert(`🎉 MLK Day Refund!\n\nYou've been refunded ${refundAmount} coins for the Read reward purchases made before holiday sale was enabled.`);
+        needsSave = true;
+    }
+
     // Cleanup: Sync History with Recurrence State
     // If it's in history for TODAY but NOT in recurringCompletions, it means it was unchecked (but history delete failed).
     // So we should REMOVE it from History.
@@ -1131,7 +1141,7 @@ function getResetDateString() {
     return `${year}-${month}-${day}`;
 }
 
-// Check if weekend sale is active (6AM Saturday to 6AM Monday)
+// Check if weekend sale is active (6AM Saturday to 6AM Monday) or on a holiday
 function isWeekendSale() {
     const now = new Date();
     const day = now.getDay(); // 0=Sun, 6=Sat
@@ -1143,6 +1153,23 @@ function isWeekendSale() {
     if (day === 0) return true;
     // Monday before 6AM
     if (day === 1 && hour < 6) return true;
+
+    // Check for holiday dates (6AM to 6AM next day)
+    const holidays = [
+        '2026-01-19', // MLK Day
+    ];
+
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    // Check if today is a holiday (after 6AM)
+    if (holidays.includes(dateStr) && hour >= 6) return true;
+
+    // Check if yesterday was a holiday (before 6AM today)
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+    if (holidays.includes(yesterdayStr) && hour < 6) return true;
+
     return false;
 }
 
