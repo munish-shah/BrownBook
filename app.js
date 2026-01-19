@@ -213,16 +213,6 @@ async function runMigrationsAndCleanup() {
         needsSave = true;
     }
 
-    // Second refund for MLK day purchases (4 purchases at 1+2+3+4=10 instead of 1+1+2+2=6)
-    if (!appData.stats.mlk_day_refund_2026_01_19) {
-        const refundAmount = 4;
-        appData.stats.currentBalance += refundAmount;
-        appData.stats.mlk_day_refund_2026_01_19 = true;
-        console.log(`MLK day refund applied: +${refundAmount} coins`);
-        alert(`🎉 MLK Day Refund!\n\nYou've been refunded ${refundAmount} coins for the Read reward purchases made before holiday sale was enabled.`);
-        needsSave = true;
-    }
-
     // Cleanup: Sync History with Recurrence State
     // If it's in history for TODAY but NOT in recurringCompletions, it means it was unchecked (but history delete failed).
     // So we should REMOVE it from History.
