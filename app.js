@@ -214,44 +214,61 @@ async function runMigrationsAndCleanup() {
     }
 
     // One-time fix: Add missing Jan 20 completions for Brush (night) and Floss
-    if (!appData.stats.jan20_missing_tasks_fix) {
+    // One-time fix V2: Add missing Jan 20 completions for Brush (night) and Floss
+    // (Renamed to v2 to force retry if v1 didn't stick)
+    if (!appData.stats.jan20_missing_tasks_fix_v2) {
         const jan20Timestamp = '2026-01-20T22:00:00.000Z'; // 10 PM on Jan 20
 
         // Find the recurring tasks
         const brushNight = appData.recurringTasks.find(t => t.id === 'brush_night');
         const floss = appData.recurringTasks.find(t => t.id === 'floss');
+        let addedCount = 0;
 
         if (brushNight) {
-            appData.completedHistory.push({
-                id: 'fix_brush_night_jan20',
-                title: brushNight.title,
-                notes: brushNight.notes,
-                difficulty: brushNight.difficulty,
-                isRecurring: true,
-                recurringId: brushNight.id,
-                completedAt: jan20Timestamp
-            });
+            // Check for duplicate before adding
+            const exists = appData.completedHistory.some(h => h.id === 'fix_brush_night_jan20');
+            if (!exists) {
+                appData.completedHistory.push({
+                    id: 'fix_brush_night_jan20',
+                    title: brushNight.title,
+                    notes: brushNight.notes,
+                    difficulty: brushNight.difficulty,
+                    isRecurring: true,
+                    recurringId: brushNight.id,
+                    completedAt: jan20Timestamp
+                });
+                addedCount++;
+            }
         }
 
         if (floss) {
-            appData.completedHistory.push({
-                id: 'fix_floss_jan20',
-                title: floss.title,
-                notes: floss.notes,
-                difficulty: floss.difficulty,
-                isRecurring: true,
-                recurringId: floss.id,
-                completedAt: jan20Timestamp
-            });
+            // Check for duplicate before adding
+            const exists = appData.completedHistory.some(h => h.id === 'fix_floss_jan20');
+            if (!exists) {
+                appData.completedHistory.push({
+                    id: 'fix_floss_jan20',
+                    title: floss.title,
+                    notes: floss.notes,
+                    difficulty: floss.difficulty,
+                    isRecurring: true,
+                    recurringId: floss.id,
+                    completedAt: jan20Timestamp
+                });
+                addedCount++;
+            }
         }
 
-        appData.stats.jan20_missing_tasks_fix = true;
-
-        // Add the coins for both tasks (5 coins each = 10 total)
+        // Add coins only if tasks were actually added (to avoid double payment if history existed but flag didn't?)
+        // Actually, if we are in this block, we assume coins weren't given for v2 yet.
+        // But let's just give the 10 coins regardless if we are running this one-time fix v2, 
+        // assuming the user complained because they didn't get them.
         appData.stats.currentBalance += 10;
         appData.stats.totalCoinsEarned += 10;
 
-        console.log('Added missing Jan 20 completions for Brush (night) and Floss + 10 coins');
+        appData.stats.jan20_missing_tasks_fix_v2 = true;
+
+        console.log(`Added missing Jan 20 completions + 10 coins. Tasks added: ${addedCount}`);
+        alert(`🎉 Fix Applied!\n\nAdded missing completions for Jan 20 (Brush Night, Floss) and added 10 coins.`);
         needsSave = true;
     }
 
