@@ -213,6 +213,43 @@ async function runMigrationsAndCleanup() {
         needsSave = true;
     }
 
+    // One-time fix: Add missing Jan 20 completions for Brush (night) and Floss
+    if (!appData.stats.jan20_missing_tasks_fix) {
+        const jan20Timestamp = '2026-01-20T22:00:00.000Z'; // 10 PM on Jan 20
+
+        // Find the recurring tasks
+        const brushNight = appData.recurringTasks.find(t => t.id === 'brush_night');
+        const floss = appData.recurringTasks.find(t => t.id === 'floss');
+
+        if (brushNight) {
+            appData.completedHistory.push({
+                id: 'fix_brush_night_jan20',
+                title: brushNight.title,
+                notes: brushNight.notes,
+                difficulty: brushNight.difficulty,
+                isRecurring: true,
+                recurringId: brushNight.id,
+                completedAt: jan20Timestamp
+            });
+        }
+
+        if (floss) {
+            appData.completedHistory.push({
+                id: 'fix_floss_jan20',
+                title: floss.title,
+                notes: floss.notes,
+                difficulty: floss.difficulty,
+                isRecurring: true,
+                recurringId: floss.id,
+                completedAt: jan20Timestamp
+            });
+        }
+
+        appData.stats.jan20_missing_tasks_fix = true;
+        console.log('Added missing Jan 20 completions for Brush (night) and Floss');
+        needsSave = true;
+    }
+
     // Cleanup: Sync History with Recurrence State
     // If it's in history for TODAY but NOT in recurringCompletions, it means it was unchecked (but history delete failed).
     // So we should REMOVE it from History.
