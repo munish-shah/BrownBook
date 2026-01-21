@@ -246,7 +246,12 @@ async function runMigrationsAndCleanup() {
         }
 
         appData.stats.jan20_missing_tasks_fix = true;
-        console.log('Added missing Jan 20 completions for Brush (night) and Floss');
+
+        // Add the coins for both tasks (5 coins each = 10 total)
+        appData.stats.currentBalance += 10;
+        appData.stats.totalCoinsEarned += 10;
+
+        console.log('Added missing Jan 20 completions for Brush (night) and Floss + 10 coins');
         needsSave = true;
     }
 
