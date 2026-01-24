@@ -1733,13 +1733,28 @@ input[type="range"]::-webkit-slider-thumb {
     display: flex;
     align-items: flex-end;
     justify-content: space-around;
+    /* Distribute evenly */
     height: 180px;
-    gap: 12px;
-    padding: 20px 16px 0 16px;
+    gap: 8px;
+    /* Reduced gap from 12px */
+    padding: 20px 8px 0 8px;
+    /* Reduced side padding */
+    width: 100%;
+}
+
+@media (max-width: 400px) {
+    .chart-bars {
+        gap: 4px;
+        /* Even smaller gap for small phones */
+        padding-left: 4px;
+        padding-right: 4px;
+    }
 }
 
 .chart-bar {
     flex: 1;
+    min-width: 0;
+    /* Critical: allows flex item to shrink below content size */
     max-width: 60px;
     display: flex;
     flex-direction: column;
