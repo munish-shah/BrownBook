@@ -514,7 +514,82 @@ function setupEventListeners() {
             filter.classList.add('active');
             renderProgress();
         });
+        // Drag and drop for active tasks
+        const activeList = document.getElementById('activeTaskList');
+        activeList.addEventListener('dragover', handleDragOver);
+        activeList.addEventListener('drop', handleDrop);
     });
+}
+
+// ============= DRAG AND DROP =============
+
+function handleDragStart(e) {
+    e.dataTransfer.setData('text/plain', e.target.dataset.id);
+    e.target.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragEnd(e) {
+    e.target.classList.remove('dragging');
+}
+
+function handleDragOver(e) {
+    e.preventDefault(); // Enable dropping
+    const container = document.getElementById('activeTaskList');
+    const afterElement = getDragAfterElement(container, e.clientY);
+    const draggable = document.querySelector('.dragging');
+    if (!draggable) return;
+
+    if (afterElement == null) {
+        container.appendChild(draggable);
+    } else {
+        container.insertBefore(draggable, afterElement);
+    }
+}
+
+async function handleDrop(e) {
+    e.preventDefault();
+    const id = e.dataTransfer.getData('text/plain');
+    if (!id) return;
+
+    const container = document.getElementById('activeTaskList');
+    const taskRows = Array.from(container.querySelectorAll('.task-row'));
+    const newOrderIds = taskRows.map(row => row.dataset.id);
+
+    // Reorder appData.tasks
+    const taskMap = new Map(appData.tasks.map(t => [t.id, t]));
+    const newTasks = [];
+
+    newOrderIds.forEach(taskId => {
+        if (taskMap.has(taskId)) {
+            newTasks.push(taskMap.get(taskId));
+            taskMap.delete(taskId);
+        }
+    });
+
+    // Append any remaining tasks (safety fallback)
+    if (taskMap.size > 0) {
+        for (const task of taskMap.values()) {
+            newTasks.push(task);
+        }
+    }
+
+    appData.tasks = newTasks;
+    await saveData();
+}
+
+function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.task-row:not(.dragging)')];
+
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
 // Tab navigation
@@ -761,6 +836,12 @@ function renderTasks() {
     document.querySelectorAll('.recurring-delete').forEach(btn => {
         btn.addEventListener('click', () => deleteRecurringTask(btn.dataset.id));
     });
+
+    // Drag listeners for active tasks
+    document.querySelectorAll('.task-row[draggable="true"]').forEach(row => {
+        row.addEventListener('dragstart', handleDragStart);
+        row.addEventListener('dragend', handleDragEnd);
+    });
 }
 
 function createTaskRow(task, isCompleted) {
@@ -775,7 +856,7 @@ function createTaskRow(task, isCompleted) {
     }
 
     return `
-        <div class="task-row ${isCompleted ? 'completed' : ''}" data-id="${task.id}">
+        <div class="task-row ${isCompleted ? 'completed' : ''}" data-id="${task.id}" draggable="${!isCompleted}">
             <div class="task-checkbox ${isCompleted ? 'completed-task' : ''} ${task.difficulty} ${isCompleted ? 'checked' : ''}" data-id="${task.id}">
                 ${isCompleted ? '✓' : ''}
             </div>
