@@ -514,11 +514,18 @@ function setupEventListeners() {
             filter.classList.add('active');
             renderProgress();
         });
-        // Drag and drop for active tasks
-        const activeList = document.getElementById('activeTaskList');
-        activeList.addEventListener('dragover', handleDragOver);
-        activeList.addEventListener('drop', handleDrop);
-    });
+    }); // Close time-filter forEach
+
+    // Drag and drop for active tasks
+    const activeList = document.getElementById('activeTaskList');
+    activeList.addEventListener('dragover', (e) => handleDragOver(e, activeList));
+    activeList.addEventListener('drop', (e) => handleDrop(e, 'active'));
+
+    // Drag and drop for recurring tasks
+    const recurringList = document.getElementById('recurringTaskList');
+    recurringList.addEventListener('dragover', (e) => handleDragOver(e, recurringList));
+    recurringList.addEventListener('drop', (e) => handleDrop(e, 'recurring'));
+
 }
 
 // ============= DRAG AND DROP =============
@@ -533,9 +540,8 @@ function handleDragEnd(e) {
     e.target.classList.remove('dragging');
 }
 
-function handleDragOver(e) {
+function handleDragOver(e, container) {
     e.preventDefault(); // Enable dropping
-    const container = document.getElementById('activeTaskList');
     const afterElement = getDragAfterElement(container, e.clientY);
     const draggable = document.querySelector('.dragging');
     if (!draggable) return;
@@ -547,19 +553,32 @@ function handleDragOver(e) {
     }
 }
 
-async function handleDrop(e) {
+async function handleDrop(e, type) {
     e.preventDefault();
     const id = e.dataTransfer.getData('text/plain');
     if (!id) return;
 
-    const container = document.getElementById('activeTaskList');
+    let container, listVar;
+
+    if (type === 'active') {
+        container = document.getElementById('activeTaskList');
+        listVar = 'tasks';
+    } else if (type === 'recurring') {
+        container = document.getElementById('recurringTaskList');
+        listVar = 'recurringTasks';
+    } else {
+        return;
+    }
+
     const taskRows = Array.from(container.querySelectorAll('.task-row'));
     const newOrderIds = taskRows.map(row => row.dataset.id);
 
-    // Reorder appData.tasks
-    const taskMap = new Map(appData.tasks.map(t => [t.id, t]));
+    // Reorder the corresponding array
+    const sourceArray = appData[listVar];
+    const taskMap = new Map(sourceArray.map(t => [t.id, t]));
     const newTasks = [];
 
+    // 1. Add reordered visible items
     newOrderIds.forEach(taskId => {
         if (taskMap.has(taskId)) {
             newTasks.push(taskMap.get(taskId));
@@ -567,15 +586,18 @@ async function handleDrop(e) {
         }
     });
 
-    // Append any remaining tasks (safety fallback)
+    // 2. Append any remaining items (invisible ones or ones not in the DOM list)
     if (taskMap.size > 0) {
         for (const task of taskMap.values()) {
             newTasks.push(task);
         }
     }
 
-    appData.tasks = newTasks;
+    appData[listVar] = newTasks;
     await saveData();
+
+    // Re-render to ensure consistency
+    renderTasks();
 }
 
 function getDragAfterElement(container, y) {
@@ -892,7 +914,7 @@ function getTimeRemaining(expiresAt) {
 function createRecurringTaskRow(task, isCompleted) {
     const diff = DIFFICULTIES[task.difficulty];
     return `
-        <div class="task-row recurring-row ${isCompleted ? 'completed' : ''}" data-id="${task.id}">
+        <div class="task-row recurring-row ${isCompleted ? 'completed' : ''}" data-id="${task.id}" draggable="${!isCompleted}">
             <div class="task-checkbox recurring ${task.difficulty} ${isCompleted ? 'checked' : ''}" data-id="${task.id}">
                 ${isCompleted ? '✓' : '🔄'}
             </div>
