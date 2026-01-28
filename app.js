@@ -49,6 +49,7 @@ let appData = {
     completedHistory: [],
     rewards: [],
     customShopItems: [],
+    focusPinnedIds: [], // Ordered list of pinned task IDs for Focus section
     stats: {
         totalCoinsEarned: 0,
         currentBalance: 0,
@@ -526,6 +527,11 @@ function setupEventListeners() {
     recurringList.addEventListener('dragover', (e) => handleDragOver(e, recurringList));
     recurringList.addEventListener('drop', (e) => handleDrop(e, 'recurring'));
 
+    // Drag and drop for focus tasks
+    const focusList = document.getElementById('focusTaskList');
+    focusList.addEventListener('dragover', (e) => handleDragOver(e, focusList));
+    focusList.addEventListener('drop', (e) => handleDrop(e, 'focus'));
+
 }
 
 // ============= DRAG AND DROP =============
@@ -566,6 +572,14 @@ async function handleDrop(e, type) {
     } else if (type === 'recurring') {
         container = document.getElementById('recurringTaskList');
         listVar = 'recurringTasks';
+    } else if (type === 'focus') {
+        // Focus section - just reorder focusPinnedIds based on DOM order
+        container = document.getElementById('focusTaskList');
+        const taskRows = Array.from(container.querySelectorAll('.task-row'));
+        appData.focusPinnedIds = taskRows.map(row => row.dataset.id);
+        await saveData();
+        renderTasks();
+        return;
     } else {
         return;
     }
@@ -612,6 +626,23 @@ function getDragAfterElement(container, y) {
             return closest;
         }
     }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+// Toggle pin status for a task (add/remove from Focus)
+async function togglePin(taskId) {
+    if (!appData.focusPinnedIds) appData.focusPinnedIds = [];
+
+    const index = appData.focusPinnedIds.indexOf(taskId);
+    if (index > -1) {
+        // Unpin
+        appData.focusPinnedIds.splice(index, 1);
+    } else {
+        // Pin (add to end)
+        appData.focusPinnedIds.push(taskId);
+    }
+
+    await saveData();
+    renderTasks();
 }
 
 // Tab navigation
@@ -819,6 +850,45 @@ function renderTasks() {
     document.getElementById('activeTasks').style.display = hasActive ? 'block' : 'none';
     document.getElementById('todayCompletedTasks').style.display = hasTodayCompleted ? 'block' : 'none';
 
+    // ============= FOCUS SECTION =============
+    // Ensure focusPinnedIds exists
+    if (!appData.focusPinnedIds) appData.focusPinnedIds = [];
+
+    // Build focus tasks from pinned IDs (preserve order)
+    const focusTasks = [];
+    appData.focusPinnedIds.forEach(id => {
+        // Check if it's a regular task
+        const task = activeTasks.find(t => t.id === id);
+        if (task) {
+            focusTasks.push({ task, type: 'task' });
+            return;
+        }
+        // Check if it's a recurring task (and not completed today)
+        const recurring = recurringNotCompleted.find(t => t.id === id);
+        if (recurring) {
+            focusTasks.push({ task: recurring, type: 'recurring' });
+        }
+    });
+
+    // Clean up stale pinned IDs (tasks that no longer exist or are completed)
+    const validPinnedIds = focusTasks.map(f => f.task.id);
+    if (validPinnedIds.length !== appData.focusPinnedIds.length) {
+        appData.focusPinnedIds = validPinnedIds;
+        saveData(); // Async, fire and forget
+    }
+
+    const hasFocus = focusTasks.length > 0;
+    document.getElementById('focusTasks').style.display = hasFocus ? 'block' : 'none';
+
+    // Render Focus section
+    document.getElementById('focusTaskList').innerHTML = focusTasks.map(f => {
+        if (f.type === 'recurring') {
+            return createRecurringTaskRow(f.task, false, true);
+        } else {
+            return createTaskRow(f.task, false, true);
+        }
+    }).join('');
+
     // Render only non-completed recurring tasks in Recurring section
     document.getElementById('recurringTaskList').innerHTML = recurringNotCompleted.map(task =>
         createRecurringTaskRow(task, false)
@@ -859,6 +929,14 @@ function renderTasks() {
         btn.addEventListener('click', () => deleteRecurringTask(btn.dataset.id));
     });
 
+    // Pin button listeners
+    document.querySelectorAll('.task-pin').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            togglePin(btn.dataset.id);
+        });
+    });
+
     // Drag listeners for active tasks
     document.querySelectorAll('.task-row[draggable="true"]').forEach(row => {
         row.addEventListener('dragstart', handleDragStart);
@@ -866,8 +944,10 @@ function renderTasks() {
     });
 }
 
-function createTaskRow(task, isCompleted) {
+function createTaskRow(task, isCompleted, inFocusSection = false) {
     const diff = DIFFICULTIES[task.difficulty];
+    const isPinned = appData.focusPinnedIds && appData.focusPinnedIds.includes(task.id);
+    const pinIcon = isPinned ? '📍' : '📌';
 
     // Calculate expiration timer if applicable
     let expiryHtml = '';
@@ -877,8 +957,11 @@ function createTaskRow(task, isCompleted) {
         expiryHtml = `<span class="task-expiry ${isUrgent ? 'urgent' : ''}">${timeLeft.display}</span>`;
     }
 
+    // Pin button (only show for active tasks, not completed)
+    const pinBtn = !isCompleted ? `<button class="task-pin ${isPinned ? 'pinned' : ''}" data-id="${task.id}" data-type="task">${pinIcon}</button>` : '';
+
     return `
-        <div class="task-row ${isCompleted ? 'completed' : ''}" data-id="${task.id}" draggable="${!isCompleted}">
+        <div class="task-row ${isCompleted ? 'completed' : ''} ${inFocusSection ? 'in-focus' : ''}" data-id="${task.id}" data-type="task" draggable="${!isCompleted}">
             <div class="task-checkbox ${isCompleted ? 'completed-task' : ''} ${task.difficulty} ${isCompleted ? 'checked' : ''}" data-id="${task.id}">
                 ${isCompleted ? '✓' : ''}
             </div>
@@ -890,6 +973,7 @@ function createTaskRow(task, isCompleted) {
             <div class="task-coins ${task.difficulty}">
                 ${diff.emoji} ${diff.coins}
             </div>
+            ${pinBtn}
             ${!isCompleted ? `<button class="task-delete" data-id="${task.id}">🗑</button>` : ''}
         </div>
     `;
@@ -911,10 +995,16 @@ function getTimeRemaining(expiresAt) {
     return { display: `⏰ ${hours}h ${minutes}m`, totalMs: diff };
 }
 
-function createRecurringTaskRow(task, isCompleted) {
+function createRecurringTaskRow(task, isCompleted, inFocusSection = false) {
     const diff = DIFFICULTIES[task.difficulty];
+    const isPinned = appData.focusPinnedIds && appData.focusPinnedIds.includes(task.id);
+    const pinIcon = isPinned ? '📍' : '📌';
+
+    // Pin button (only show for active recurring tasks, not completed)
+    const pinBtn = !isCompleted ? `<button class="task-pin ${isPinned ? 'pinned' : ''}" data-id="${task.id}" data-type="recurring">${pinIcon}</button>` : '';
+
     return `
-        <div class="task-row recurring-row ${isCompleted ? 'completed' : ''}" data-id="${task.id}" draggable="${!isCompleted}">
+        <div class="task-row recurring-row ${isCompleted ? 'completed' : ''} ${inFocusSection ? 'in-focus' : ''}" data-id="${task.id}" data-type="recurring" draggable="${!isCompleted}">
             <div class="task-checkbox recurring ${task.difficulty} ${isCompleted ? 'checked' : ''}" data-id="${task.id}">
                 ${isCompleted ? '✓' : '🔄'}
             </div>
@@ -925,6 +1015,7 @@ function createRecurringTaskRow(task, isCompleted) {
             <div class="task-coins ${task.difficulty}">
                 ${diff.emoji} ${diff.coins}
             </div>
+            ${pinBtn}
             <button class="recurring-delete" data-id="${task.id}">🗑</button>
         </div>
     `;

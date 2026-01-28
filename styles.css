@@ -2116,3 +2116,35 @@ input[type="range"]::-webkit-slider-thumb {
     transform: scale(1.02);
     z-index: 10;
 }
+
+/* Pin Button Styles */
+.task-pin {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 6px;
+    opacity: 0.5;
+    transition: opacity 0.2s, transform 0.2s;
+    border-radius: var(--radius-sm);
+}
+
+.task-pin:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.task-pin.pinned {
+    opacity: 1;
+    color: var(--accent-warm);
+}
+
+/* Focus Section Styling */
+#focusTasks .section-title {
+    color: var(--accent-warm);
+}
+
+.task-row.in-focus {
+    border-left: 3px solid var(--accent-warm);
+    padding-left: 12px;
+}
