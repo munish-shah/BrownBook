@@ -889,15 +889,23 @@ function renderTasks() {
         }
     }).join('');
 
-    // Render only non-completed recurring tasks in Recurring section
-    document.getElementById('recurringTaskList').innerHTML = recurringNotCompleted.map(task =>
+    // Filter out pinned tasks from original sections (they only show in Focus)
+    const unpinnedRecurring = recurringNotCompleted.filter(t => !validPinnedIds.includes(t.id));
+    const unpinnedActive = activeTasks.filter(t => !validPinnedIds.includes(t.id));
+
+    // Render only non-completed, unpinned recurring tasks in Recurring section
+    document.getElementById('recurringTaskList').innerHTML = unpinnedRecurring.map(task =>
         createRecurringTaskRow(task, false)
     ).join('');
 
-    // Render active regular tasks
-    document.getElementById('activeTaskList').innerHTML = activeTasks.map(task =>
+    // Render active regular tasks (excluding pinned)
+    document.getElementById('activeTaskList').innerHTML = unpinnedActive.map(task =>
         createTaskRow(task, false)
     ).join('');
+
+    // Update section visibility based on unpinned counts
+    document.getElementById('recurringTasks').style.display = unpinnedRecurring.length > 0 ? 'block' : 'none';
+    document.getElementById('activeTasks').style.display = unpinnedActive.length > 0 ? 'block' : 'none';
 
     // Render today's completed (both regular tasks and completed recurring tasks)
     let todayCompletedHTML = recurringCompleted.map(task =>
