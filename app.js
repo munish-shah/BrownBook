@@ -101,6 +101,7 @@ async function init() {
             // Run other migrations/cleanup only on first load
             if (isFirstLoad) {
                 runMigrationsAndCleanup();
+                runBackfillJan31(); // One-time fix for missing Jan 31st tasks
                 isFirstLoad = false;
             }
 
@@ -2297,3 +2298,82 @@ function escapeHtml(text) {
 
 // Start the app
 init();
+
+// One-time backfill for Jan 31st 2026 missing tasks
+async function runBackfillJan31() {
+    const FIX_ID = 'backfill_jan31_v1';
+    if (localStorage.getItem(FIX_ID)) return;
+
+    console.log('Running backfill for Jan 31st...');
+    
+    // Date: Jan 31st 2026 (approx 11pm)
+    const backfillDate = new Date('2026-01-31T23:00:00');
+    const backfillDateStr = getDateString(backfillDate);
+
+    let modifications = 0;
+    const tasksToFind = [
+        { id: 'brush_night', exactId: true },
+        { id: 'floss', exactId: true },
+        { title: 'Job Applications', exactId: false }
+    ];
+
+    tasksToFind.forEach(target => {
+        // Find the task
+        let task;
+        if (target.exactId) {
+            task = appData.recurringTasks.find(t => t.id === target.id);
+        } else {
+            task = appData.recurringTasks.find(t => t.title && t.title.toLowerCase().includes(target.title.toLowerCase()));
+        }
+
+        if (task) {
+            // Check if already completed on that day
+            const alreadyDone = appData.completedHistory.some(h => {
+                if (!h.completedAt) return false;
+                const d = new Date(h.completedAt);
+                // Adjust for 6am day start if needed, but simple date string check usually enough for this specific request
+                if (d.getHours() < 6) d.setDate(d.getDate() - 1);
+                return getDateString(d) === backfillDateStr && h.recurringId === task.id;
+            });
+
+            if (!alreadyDone) {
+                const diff = DIFFICULTIES[task.difficulty] || DIFFICULTIES['medium'];
+                
+                // Add to history
+                appData.completedHistory.push({
+                    id: Date.now() + Math.random().toString(), // unique ID
+                    title: task.title,
+                    difficulty: task.difficulty,
+                    coins: diff.coins,
+                    completedAt: backfillDate.toISOString(),
+                    isRecurring: true,
+                    recurringId: task.id
+                });
+
+                // Add coins
+                appData.stats.totalCoinsEarned += diff.coins;
+                appData.stats.currentBalance += diff.coins;
+                
+                // Update stats
+                const diffKey = `tasksCompleted${task.difficulty.charAt(0).toUpperCase() + task.difficulty.slice(1)}`;
+                if (appData.stats[diffKey] !== undefined) {
+                    appData.stats[diffKey]++;
+                }
+
+                modifications++;
+                console.log(`Backfilled: ${task.title}`);
+            } else {
+                console.log(`Skipped (already done): ${task.title}`);
+            }
+        } else {
+            console.log(`Task not found: ${target.id || target.title}`);
+        }
+    });
+
+    if (modifications > 0) {
+        await saveData();
+        alert(`Backfilled ${modifications} tasks for Jan 31st. +Coins added!`);
+    }
+
+    localStorage.setItem(FIX_ID, 'true');
+}
