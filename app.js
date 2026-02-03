@@ -788,13 +788,18 @@ function handleDragEnd(e) {
 function handleDragOver(e, container) {
     e.preventDefault(); // Enable dropping
     const afterElement = getDragAfterElement(container, e.clientY);
-    const draggable = document.querySelector('.dragging');
-    if (!draggable) return;
+    const draggingRow = document.querySelector('.task-row.dragging');
+    if (!draggingRow) return;
+
+    // Move the entire wrapper (which contains task-row + subtasks)
+    const draggable = draggingRow.closest('.task-row-wrapper') || draggingRow;
 
     if (afterElement == null) {
         container.appendChild(draggable);
     } else {
-        container.insertBefore(draggable, afterElement);
+        // Find the wrapper of the afterElement
+        const afterWrapper = afterElement.closest('.task-row-wrapper') || afterElement;
+        container.insertBefore(draggable, afterWrapper);
     }
 }
 
