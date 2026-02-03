@@ -2148,6 +2148,7 @@ input[type="range"]::-webkit-slider-thumb {
     border-left: 3px solid var(--accent-warm);
     padding-left: 12px;
 }
+
 /* Subtasks Feature Styles */
 
 /* Modal Input Styles */
@@ -2180,7 +2181,7 @@ input[type="range"]::-webkit-slider-thumb {
     height: 20px;
 }
 
-.switch input { 
+.switch input {
     opacity: 0;
     width: 0;
     height: 0;
@@ -2210,11 +2211,11 @@ input[type="range"]::-webkit-slider-thumb {
     border-radius: 50%;
 }
 
-input:checked + .slider {
+input:checked+.slider {
     background-color: var(--primary-color);
 }
 
-input:checked + .slider:before {
+input:checked+.slider:before {
     transform: translateX(16px);
 }
 
@@ -2243,7 +2244,8 @@ input:checked + .slider:before {
     font-size: 14px;
     padding: 8px;
     text-align: center;
-    display: none; /* Hidden by default unless distributed mode is on */
+    display: none;
+    /* Hidden by default unless distributed mode is on */
 }
 
 .subtask-input-row.distributed input[type="number"] {
@@ -2264,13 +2266,16 @@ input:checked + .slider:before {
 }
 
 .btn-add-subtask {
-    color: var(--primary-color);
-    font-weight: 500;
+    color: var(--accent-warm);
+    background: transparent;
+    border: none;
+    font-weight: 600;
     font-size: 14px;
-    padding: 4px 0;
+    padding: 8px 0;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
+    cursor: pointer;
 }
 
 .validation-msg {
@@ -2298,7 +2303,8 @@ input:checked + .slider:before {
 
 .subtasks-container {
     width: 100%;
-    padding-left: 36px; /* Indent subtasks */
+    padding-left: 36px;
+    /* Indent subtasks */
     margin-top: 8px;
     display: none;
 }
@@ -2312,7 +2318,8 @@ input:checked + .slider:before {
 .subtask-row {
     display: flex;
     align-items: center;
-    background: rgba(0, 0, 0, 0.02); /* Very subtle bg */
+    background: rgba(0, 0, 0, 0.02);
+    /* Very subtle bg */
     padding: 8px 12px;
     border-radius: var(--radius-sm);
     gap: 10px;

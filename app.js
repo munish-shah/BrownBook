@@ -2643,3 +2643,7 @@ async function runBackfillJan31() {
 
     localStorage.setItem(FIX_ID, 'true');
 }
+
+// Expose subtask functions globally for inline onclick handlers
+window.toggleSubtasks = toggleSubtasks;
+window.toggleSubtask = toggleSubtask;
