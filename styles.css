@@ -2428,7 +2428,7 @@ input:checked+.slider:before {
 
 .subtask-progress-track {
     flex: 1;
-    max-width: 520px;
+    max-width: 600px;
     height: 6px;
     background: var(--border-color);
     border-radius: 3px;
