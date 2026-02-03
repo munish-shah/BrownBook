@@ -986,6 +986,10 @@ function shouldShowIntervalTask(task) {
 function renderTasks() {
     const today = getTodayDateString();
 
+    // Preserve open subtask containers before re-render
+    const openSubtaskIds = Array.from(document.querySelectorAll('.subtasks-container.open'))
+        .map(el => el.id.replace('subtasks-', ''));
+
     // Get regular active tasks
     const activeTasks = appData.tasks.filter(t => !t.completed);
 
@@ -1149,6 +1153,18 @@ function renderTasks() {
                 toggleSubtask(e, parentId, subtaskId, taskType);
             }
         });
+    });
+
+    // Restore previously open subtask containers
+    openSubtaskIds.forEach(taskId => {
+        const container = document.getElementById(`subtasks-${taskId}`);
+        const btn = document.querySelector(`.task-expand-btn[data-expand-id="${taskId}"]`);
+        if (container) {
+            container.classList.add('open');
+        }
+        if (btn) {
+            btn.classList.add('expanded');
+        }
     });
 }
 
