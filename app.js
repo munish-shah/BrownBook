@@ -457,8 +457,6 @@ function toggleSubtasks(event, taskId) {
 
 // Add logic to setupEventListeners for adding subtasks in UI
 function setupEventListeners() {
-    // ... (existing listeners)
-
     // Add Subtask Button
     document.getElementById('addSubtaskBtn').addEventListener('click', () => {
         const container = document.getElementById('subtaskListInput');
@@ -498,8 +496,6 @@ function setupEventListeners() {
 
     // Input change validation
     document.getElementById('subtaskListInput').addEventListener('input', validateSubtaskCoins);
-
-    // ... (rest of render listeners)
 
     // Navigation tabs
     document.querySelectorAll('.nav-tab').forEach(tab => {
