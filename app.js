@@ -393,6 +393,20 @@ async function toggleSubtask(event, parentId, subtaskId, type) {
         }
     }
 
+    // Update progress bar in real-time
+    const taskRow = document.querySelector(`.task-row[data-id="${parentId}"]`);
+    if (taskRow) {
+        const progressBar = taskRow.querySelector('.subtask-progress-bar');
+        const progressText = taskRow.querySelector('.subtask-progress-text');
+        if (progressBar && progressText) {
+            const total = task.subtasks.length;
+            const completed = task.subtasks.filter(s => s.completed).length;
+            const percent = Math.round((completed / total) * 100);
+            progressBar.style.width = `${percent}%`;
+            progressText.textContent = `${completed}/${total}`;
+        }
+    }
+
     // Coin logic
     if (task.distributeCoins && subtask.coins > 0) {
         if (subtask.completed) {
@@ -481,6 +495,29 @@ async function addSubtaskToExisting(parentId, taskType, title) {
     };
 
     task.subtasks.push(newSubtask);
+
+    await saveData();
+    renderTasks();
+}
+
+// Delete a subtask from an existing task
+async function deleteSubtask(parentId, subtaskId, taskType) {
+    const listVar = taskType === 'recurring' ? 'recurringTasks' : 'tasks';
+    const task = appData[listVar].find(t => t.id === parentId);
+    if (!task || !task.subtasks) return;
+
+    const subtaskIndex = task.subtasks.findIndex(s => s.id === subtaskId);
+    if (subtaskIndex === -1) return;
+
+    // If subtask was completed and had distributed coins, deduct them
+    const subtask = task.subtasks[subtaskIndex];
+    if (task.distributeCoins && subtask.completed && subtask.coins > 0) {
+        appData.stats.totalCoinsEarned -= subtask.coins;
+        appData.stats.currentBalance -= subtask.coins;
+    }
+
+    // Remove the subtask
+    task.subtasks.splice(subtaskIndex, 1);
 
     await saveData();
     renderTasks();
@@ -1225,6 +1262,19 @@ function renderTasks() {
         // Prevent click from closing dropdown
         input.addEventListener('click', (e) => e.stopPropagation());
     });
+
+    // Subtask delete button listeners
+    document.querySelectorAll('.subtask-delete').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const parentId = btn.dataset.parentId;
+            const subtaskId = btn.dataset.subtaskId;
+            const taskType = btn.dataset.taskType;
+            if (parentId && subtaskId) {
+                deleteSubtask(parentId, subtaskId, taskType);
+            }
+        });
+    });
 }
 
 function createTaskRow(task, isCompleted, inFocusSection = false) {
@@ -1246,6 +1296,21 @@ function createTaskRow(task, isCompleted, inFocusSection = false) {
     // Subtasks HTML - always show expand button for active tasks (to allow adding subtasks)
     let subtasksHtml = '';
     let expandBtn = '';
+    let progressHtml = '';
+
+    // Calculate progress for tasks with subtasks
+    const subtaskCount = (task.subtasks || []).length;
+    const completedCount = (task.subtasks || []).filter(s => s.completed).length;
+    if (subtaskCount > 0) {
+        const progressPercent = Math.round((completedCount / subtaskCount) * 100);
+        progressHtml = `
+            <div class="subtask-progress">
+                <div class="subtask-progress-bar" style="width: ${progressPercent}%"></div>
+                <span class="subtask-progress-text">${completedCount}/${subtaskCount}</span>
+            </div>
+        `;
+    }
+
     if (!isCompleted) {
         expandBtn = `<button class="task-expand-btn" data-expand-id="${task.id}">▶</button>`;
 
@@ -1259,6 +1324,7 @@ function createTaskRow(task, isCompleted, inFocusSection = false) {
                     </div>
                     <span class="subtask-title">${escapeHtml(st.title)}</span>
                     ${coinsHtml}
+                    <button class="subtask-delete" data-parent-id="${task.id}" data-subtask-id="${st.id}" data-task-type="task">×</button>
                 </div>
             `;
         }).join('');
@@ -1296,6 +1362,7 @@ function createTaskRow(task, isCompleted, inFocusSection = false) {
                 <div class="task-content">
                     <div class="task-title">${escapeHtml(task.title)}</div>
                     ${task.notes ? `<div class="task-notes">${escapeHtml(task.notes)}</div>` : ''}
+                    ${progressHtml}
                 </div>
                 ${expiryHtml}
                 <div class="task-coins ${task.difficulty}">
@@ -1336,6 +1403,21 @@ function createRecurringTaskRow(task, isCompleted, inFocusSection = false) {
     // Subtasks HTML - always show expand button for active tasks (to allow adding subtasks)
     let subtasksHtml = '';
     let expandBtn = '';
+    let progressHtml = '';
+
+    // Calculate progress for tasks with subtasks
+    const subtaskCount = (task.subtasks || []).length;
+    const completedCount = (task.subtasks || []).filter(s => s.completed).length;
+    if (subtaskCount > 0) {
+        const progressPercent = Math.round((completedCount / subtaskCount) * 100);
+        progressHtml = `
+            <div class="subtask-progress">
+                <div class="subtask-progress-bar" style="width: ${progressPercent}%"></div>
+                <span class="subtask-progress-text">${completedCount}/${subtaskCount}</span>
+            </div>
+        `;
+    }
+
     if (!isCompleted) {
         expandBtn = `<button class="task-expand-btn" data-expand-id="${task.id}">▶</button>`;
 
@@ -1349,6 +1431,7 @@ function createRecurringTaskRow(task, isCompleted, inFocusSection = false) {
                     </div>
                     <span class="subtask-title">${escapeHtml(st.title)}</span>
                     ${coinsHtml}
+                    <button class="subtask-delete" data-parent-id="${task.id}" data-subtask-id="${st.id}" data-task-type="recurring">×</button>
                 </div>
             `;
         }).join('');
@@ -1386,6 +1469,7 @@ function createRecurringTaskRow(task, isCompleted, inFocusSection = false) {
                 <div class="task-content">
                     <div class="task-title">${escapeHtml(task.title)}</div>
                     ${task.notes ? `<div class="task-notes">${escapeHtml(task.notes)}</div>` : ''}
+                    ${progressHtml}
                 </div>
                 <div class="task-coins ${task.difficulty}">
                     ${diff.emoji} ${diff.coins}
