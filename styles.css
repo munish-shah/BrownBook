@@ -2148,3 +2148,212 @@ input[type="range"]::-webkit-slider-thumb {
     border-left: 3px solid var(--accent-warm);
     padding-left: 12px;
 }
+/* Subtasks Feature Styles */
+
+/* Modal Input Styles */
+.subtasks-section {
+    margin-top: 16px;
+    border-top: 1px solid var(--border-color);
+    padding-top: 16px;
+}
+
+.subtasks-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.toggle-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+/* Switch Toggle */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+}
+
+.switch input { 
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--border-color);
+    transition: .4s;
+    border-radius: 20px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--primary-color);
+}
+
+input:checked + .slider:before {
+    transform: translateX(16px);
+}
+
+/* Input List */
+.subtask-list-input {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.subtask-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.subtask-input-row input[type="text"] {
+    flex: 1;
+    font-size: 14px;
+    padding: 8px 12px;
+}
+
+.subtask-input-row input[type="number"] {
+    width: 70px;
+    font-size: 14px;
+    padding: 8px;
+    text-align: center;
+    display: none; /* Hidden by default unless distributed mode is on */
+}
+
+.subtask-input-row.distributed input[type="number"] {
+    display: block;
+}
+
+.btn-remove-subtask {
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    font-size: 16px;
+}
+
+.btn-remove-subtask:hover {
+    color: var(--danger-color);
+}
+
+.btn-add-subtask {
+    color: var(--primary-color);
+    font-weight: 500;
+    font-size: 14px;
+    padding: 4px 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.validation-msg {
+    font-size: 13px;
+    color: var(--danger-color);
+    margin-top: 8px;
+    font-weight: 500;
+}
+
+/* Task List Display Styles */
+.task-expand-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    color: var(--text-muted);
+    font-size: 12px;
+    transition: transform 0.2s;
+    margin-right: 4px;
+}
+
+.task-expand-btn.expanded {
+    transform: rotate(90deg);
+}
+
+.subtasks-container {
+    width: 100%;
+    padding-left: 36px; /* Indent subtasks */
+    margin-top: 8px;
+    display: none;
+}
+
+.subtasks-container.open {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.subtask-row {
+    display: flex;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.02); /* Very subtle bg */
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    gap: 10px;
+}
+
+[data-theme="dark"] .subtask-row {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.subtask-checkbox {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: white;
+    transition: all 0.2s;
+}
+
+.subtask-checkbox.completed {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.subtask-title {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.subtask-row.completed .subtask-title {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+.subtask-coins {
+    font-size: 12px;
+    color: var(--accent-gold);
+    font-weight: 600;
+}

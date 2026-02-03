@@ -364,7 +364,143 @@ async function saveData() {
 }
 
 // Event Listeners
+// Toggle Subtask
+async function toggleSubtask(event, parentId, subtaskId, type) {
+    if (event) event.stopPropagation(); // Prevent main task toggle
+
+    const listVar = type === 'recurring' ? 'recurringTasks' : 'tasks';
+    const task = appData[listVar].find(t => t.id === parentId);
+    if (!task) return;
+
+    const subtask = task.subtasks.find(s => s.id === subtaskId);
+    if (!subtask) return;
+
+    // Toggle completion
+    subtask.completed = !subtask.completed;
+
+    // Coin logic
+    if (task.distributeCoins && subtask.coins > 0) {
+        if (subtask.completed) {
+            appData.stats.totalCoinsEarned += subtask.coins;
+            appData.stats.currentBalance += subtask.coins;
+            // Add generic history entry for subtask completion? Or just silent addition?
+            // User requested distributed coins, so silent addition is probably best for subtasks, 
+            // but maybe we should track it. For now silent.
+        } else {
+            appData.stats.currentBalance -= subtask.coins;
+            appData.stats.totalCoinsEarned -= subtask.coins; // Revert earned
+        }
+    }
+
+    // Check if ALL subtasks are completed
+    const allCompleted = task.subtasks.every(s => s.completed);
+
+    // If all subtasks done, complete the main task (but only if it's NOT already completed)
+    // Note: User can complete main task anytime, which auto-completes subtasks.
+    // If user checks last subtask, we likely want to complete the main task too.
+    if (allCompleted) {
+        if (type === 'task' && !task.completed) {
+            await toggleTask(parentId, true); // Pass flag to skip subtask logic to prevent loop
+            return; // toggleTask handles saving
+        } else if (type === 'recurring' && !isRecurringCompletedToday(parentId)) {
+            await toggleRecurringTask(parentId, true);
+            return;
+        }
+    } else {
+        // If we uncheck a subtask, and the main task WAS completed, should we uncomplete it?
+        // Yes, likely.
+        if (type === 'task' && task.completed) {
+            await uncompleteTask(parentId); // Re-opens main task
+            // We need to ensure uncompleteTask doesn't wipe subtask state if we just want to re-open it.
+            // Standard uncompleteTask might be fine.
+            return;
+        }
+        // For recurring, "uncompleting" checks history. 
+        // If we uncheck a subtask for a DONE recurring task, we should remove the completion from history.
+        if (type === 'recurring' && isRecurringCompletedToday(parentId)) {
+            // Logic to remove recurring completion is in deleteRecurringTask (partially) or we need a new uncheck helper.
+            // Currently recurring tasks just toggle. 
+            // Let's call toggleRecurringTask which checks completion status.
+            // But we need to ensure it doesn't auto-complete all subtasks again.
+            // This is tricky. simpler: If main task is done, toggling a subtask to UNDONE should mark main task UNDONE.
+            // For recurring:
+            const historyIndex = appData.completedHistory.findIndex(h =>
+                h.recurringId === parentId && isCompletedToday(new Date(h.completedAt))
+            );
+            if (historyIndex > -1) {
+                // Remove from history (mark incomplete)
+                const entry = appData.completedHistory[historyIndex];
+                appData.stats.totalCoinsEarned -= entry.coins;
+                appData.stats.currentBalance -= entry.coins;
+                const diffKey = `tasksCompleted${entry.difficulty.charAt(0).toUpperCase() + entry.difficulty.slice(1)}`;
+                if (appData.stats[diffKey] > 0) appData.stats[diffKey]--;
+
+                appData.completedHistory.splice(historyIndex, 1);
+            }
+        }
+    }
+
+    await saveData();
+    renderTasks();
+}
+
+// Toggle visibility of subtasks
+function toggleSubtasks(event, taskId) {
+    if (event) event.stopPropagation();
+    const container = document.getElementById(`subtasks-${taskId}`);
+    const btn = event.target;
+    if (container) {
+        container.classList.toggle('open');
+        btn.classList.toggle('expanded');
+    }
+}
+
+// Add logic to setupEventListeners for adding subtasks in UI
 function setupEventListeners() {
+    // ... (existing listeners)
+
+    // Add Subtask Button
+    document.getElementById('addSubtaskBtn').addEventListener('click', () => {
+        const container = document.getElementById('subtaskListInput');
+        const distribute = document.getElementById('distributeCoinsToggle').checked;
+        const id = Date.now();
+
+        const row = document.createElement('div');
+        row.className = `subtask-input-row ${distribute ? 'distributed' : ''}`;
+        row.innerHTML = `
+            <input type="text" placeholder="Subtask title">
+            <input type="number" placeholder="Coins" value="0">
+            <button class="btn-remove-subtask" onclick="this.parentElement.remove()">×</button>
+        `;
+        container.appendChild(row);
+    });
+
+    // Toggle Distribution Mode
+    document.getElementById('distributeCoinsToggle').addEventListener('change', (e) => {
+        const isDistrubted = e.target.checked;
+        const rows = document.querySelectorAll('.subtask-input-row');
+        rows.forEach(row => {
+            if (isDistrubted) row.classList.add('distributed');
+            else row.classList.remove('distributed');
+        });
+
+        // Show/Hide validation message
+        const difficulty = document.querySelector('.diff-btn.selected');
+        if (difficulty) validateSubtaskCoins();
+    });
+
+    // Difficulty change - re-validate
+    document.querySelectorAll('.diff-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            setTimeout(validateSubtaskCoins, 10);
+        });
+    });
+
+    // Input change validation
+    document.getElementById('subtaskListInput').addEventListener('input', validateSubtaskCoins);
+
+    // ... (rest of render listeners)
+
     // Navigation tabs
     document.querySelectorAll('.nav-tab').forEach(tab => {
         tab.addEventListener('click', () => switchTab(tab.dataset.tab));
@@ -969,21 +1105,46 @@ function createTaskRow(task, isCompleted, inFocusSection = false) {
     // Pin button (only show for active tasks, not completed)
     const pinBtn = !isCompleted ? `<button class="task-pin ${isPinned ? 'pinned' : ''}" data-id="${task.id}" data-type="task">${pinIcon}</button>` : '';
 
+    // Subtasks HTML
+    let subtasksHtml = '';
+    let expandBtn = '';
+    if (task.subtasks && task.subtasks.length > 0) {
+        expandBtn = `<button class="task-expand-btn" onclick="toggleSubtasks(event, '${task.id}')">▶</button>`;
+        const subtaskRows = task.subtasks.map(st => {
+            const stCompleted = st.completed ? 'completed' : '';
+            const coinsHtml = task.distributeCoins ? `<span class="subtask-coins">+${st.coins}</span>` : '';
+            return `
+                <div class="subtask-row ${stCompleted}" data-id="${st.id}">
+                    <div class="subtask-checkbox ${stCompleted}" onclick="toggleSubtask(event, '${task.id}', '${st.id}', 'task')">
+                        ${st.completed ? '✓' : ''}
+                    </div>
+                    <span class="subtask-title">${escapeHtml(st.title)}</span>
+                    ${coinsHtml}
+                </div>
+            `;
+        }).join('');
+        subtasksHtml = `<div class="subtasks-container" id="subtasks-${task.id}">${subtaskRows}</div>`;
+    }
+
     return `
-        <div class="task-row ${isCompleted ? 'completed' : ''} ${inFocusSection ? 'in-focus' : ''}" data-id="${task.id}" data-type="task" draggable="${!isCompleted}">
-            <div class="task-checkbox ${isCompleted ? 'completed-task' : ''} ${task.difficulty} ${isCompleted ? 'checked' : ''}" data-id="${task.id}">
-                ${isCompleted ? '✓' : ''}
+        <div class="task-row-wrapper">
+            <div class="task-row ${isCompleted ? 'completed' : ''} ${inFocusSection ? 'in-focus' : ''}" data-id="${task.id}" data-type="task" draggable="${!isCompleted}">
+                ${expandBtn}
+                <div class="task-checkbox ${isCompleted ? 'completed-task' : ''} ${task.difficulty} ${isCompleted ? 'checked' : ''}" data-id="${task.id}">
+                    ${isCompleted ? '✓' : ''}
+                </div>
+                <div class="task-content">
+                    <div class="task-title">${escapeHtml(task.title)}</div>
+                    ${task.notes ? `<div class="task-notes">${escapeHtml(task.notes)}</div>` : ''}
+                </div>
+                ${expiryHtml}
+                <div class="task-coins ${task.difficulty}">
+                    ${diff.emoji} ${diff.coins}
+                </div>
+                ${pinBtn}
+                ${!isCompleted ? `<button class="task-delete" data-id="${task.id}">🗑</button>` : ''}
             </div>
-            <div class="task-content">
-                <div class="task-title">${escapeHtml(task.title)}</div>
-                ${task.notes ? `<div class="task-notes">${escapeHtml(task.notes)}</div>` : ''}
-            </div>
-            ${expiryHtml}
-            <div class="task-coins ${task.difficulty}">
-                ${diff.emoji} ${diff.coins}
-            </div>
-            ${pinBtn}
-            ${!isCompleted ? `<button class="task-delete" data-id="${task.id}">🗑</button>` : ''}
+            ${subtasksHtml}
         </div>
     `;
 }
@@ -1012,20 +1173,45 @@ function createRecurringTaskRow(task, isCompleted, inFocusSection = false) {
     // Pin button (only show for active recurring tasks, not completed)
     const pinBtn = !isCompleted ? `<button class="task-pin ${isPinned ? 'pinned' : ''}" data-id="${task.id}" data-type="recurring">${pinIcon}</button>` : '';
 
+    // Subtasks HTML
+    let subtasksHtml = '';
+    let expandBtn = '';
+    if (task.subtasks && task.subtasks.length > 0) {
+        expandBtn = `<button class="task-expand-btn" onclick="toggleSubtasks(event, '${task.id}')">▶</button>`;
+        const subtaskRows = task.subtasks.map(st => {
+            const stCompleted = st.completed ? 'completed' : '';
+            const coinsHtml = task.distributeCoins ? `<span class="subtask-coins">+${st.coins}</span>` : '';
+            return `
+                <div class="subtask-row ${stCompleted}" data-id="${st.id}">
+                    <div class="subtask-checkbox ${stCompleted}" onclick="toggleSubtask(event, '${task.id}', '${st.id}', 'recurring')">
+                        ${st.completed ? '✓' : ''}
+                    </div>
+                    <span class="subtask-title">${escapeHtml(st.title)}</span>
+                    ${coinsHtml}
+                </div>
+            `;
+        }).join('');
+        subtasksHtml = `<div class="subtasks-container" id="subtasks-${task.id}">${subtaskRows}</div>`;
+    }
+
     return `
-        <div class="task-row recurring-row ${isCompleted ? 'completed' : ''} ${inFocusSection ? 'in-focus' : ''}" data-id="${task.id}" data-type="recurring" draggable="${!isCompleted}">
-            <div class="task-checkbox recurring ${task.difficulty} ${isCompleted ? 'checked' : ''}" data-id="${task.id}">
-                ${isCompleted ? '✓' : '🔄'}
+        <div class="task-row-wrapper">
+            <div class="task-row recurring-row ${isCompleted ? 'completed' : ''} ${inFocusSection ? 'in-focus' : ''}" data-id="${task.id}" data-type="recurring" draggable="${!isCompleted}">
+                ${expandBtn}
+                <div class="task-checkbox recurring ${task.difficulty} ${isCompleted ? 'checked' : ''}" data-id="${task.id}">
+                    ${isCompleted ? '✓' : '🔄'}
+                </div>
+                <div class="task-content">
+                    <div class="task-title">${escapeHtml(task.title)}</div>
+                    ${task.notes ? `<div class="task-notes">${escapeHtml(task.notes)}</div>` : ''}
+                </div>
+                <div class="task-coins ${task.difficulty}">
+                    ${diff.emoji} ${diff.coins}
+                </div>
+                ${pinBtn}
+                <button class="recurring-delete" data-id="${task.id}">🗑</button>
             </div>
-            <div class="task-content">
-                <div class="task-title">${escapeHtml(task.title)}</div>
-                ${task.notes ? `<div class="task-notes">${escapeHtml(task.notes)}</div>` : ''}
-            </div>
-            <div class="task-coins ${task.difficulty}">
-                ${diff.emoji} ${diff.coins}
-            </div>
-            ${pinBtn}
-            <button class="recurring-delete" data-id="${task.id}">🗑</button>
+            ${subtasksHtml}
         </div>
     `;
 }
@@ -1045,6 +1231,12 @@ function openAddTaskModal() {
     document.getElementById('activeDaysInput').value = '3';
     document.getElementById('breakDaysInput').value = '1';
     document.getElementById('cycleStartSelect').value = '0';
+
+    // Sub-tasks reset
+    document.getElementById('distributeCoinsToggle').checked = false;
+    document.getElementById('subtaskListInput').innerHTML = '';
+    document.getElementById('subtaskValidationMsg').style.display = 'none';
+
     selectDifficulty(document.querySelector('.diff-btn[data-difficulty="medium"]'));
     document.getElementById('taskTitle').focus();
 }
@@ -1070,6 +1262,39 @@ function saveNewTask() {
     const notes = document.getElementById('taskNotes').value.trim();
     const isRecurring = document.getElementById('recurringTaskToggle').checked;
 
+    // Subtasks parsing
+    const subtaskInputs = document.querySelectorAll('.subtask-input-row');
+    const distributeCoins = document.getElementById('distributeCoinsToggle').checked;
+    const subtasks = [];
+    let subtaskTotalCoins = 0;
+
+    subtaskInputs.forEach(row => {
+        const titleInput = row.querySelector('input[type="text"]');
+        const coinInput = row.querySelector('input[type="number"]');
+        const sTitle = titleInput.value.trim();
+        if (sTitle) {
+            const sCoins = distributeCoins ? (parseInt(coinInput.value) || 0) : 0;
+            subtasks.push({
+                id: 'sub_' + Date.now() + Math.random().toString(36).substr(2, 5),
+                title: sTitle,
+                completed: false,
+                coins: sCoins
+            });
+            subtaskTotalCoins += sCoins;
+        }
+    });
+
+    const selectedDifficultyBtn = document.querySelector('.diff-btn.selected');
+    const difficultyCoins = parseInt(selectedDifficultyBtn.dataset.coins);
+
+    // Validation for distributed coins
+    if (distributeCoins && subtasks.length > 0) {
+        if (subtaskTotalCoins !== difficultyCoins) {
+            alert(`Error: Subtask coins total (${subtaskTotalCoins}) must equal main task reward (${difficultyCoins}).`);
+            return;
+        }
+    }
+
     if (isRecurring) {
         const recurrenceType = document.querySelector('input[name="recurrenceType"]:checked').value;
 
@@ -1078,6 +1303,8 @@ function saveNewTask() {
             id: 'custom_' + Date.now().toString(),
             title,
             notes,
+            subtasks,
+            distributeCoins,
             difficulty,
             type: recurrenceType, // 'daily' or 'interval'
             createdAt: new Date().toISOString()
@@ -1104,6 +1331,8 @@ function saveNewTask() {
             id: Date.now().toString(),
             title,
             notes,
+            subtasks,
+            distributeCoins,
             difficulty,
             completed: false,
             createdAt: new Date().toISOString()
@@ -2305,7 +2534,7 @@ async function runBackfillJan31() {
     if (localStorage.getItem(FIX_ID)) return;
 
     console.log('Running backfill for Jan 31st...');
-    
+
     // Date: Jan 31st 2026 (approx 11pm)
     const backfillDate = new Date('2026-01-31T23:00:00');
     const backfillDateStr = getDateString(backfillDate);
@@ -2338,7 +2567,7 @@ async function runBackfillJan31() {
 
             if (!alreadyDone) {
                 const diff = DIFFICULTIES[task.difficulty] || DIFFICULTIES['medium'];
-                
+
                 // Add to history
                 appData.completedHistory.push({
                     id: Date.now() + Math.random().toString(), // unique ID
@@ -2353,7 +2582,7 @@ async function runBackfillJan31() {
                 // Add coins
                 appData.stats.totalCoinsEarned += diff.coins;
                 appData.stats.currentBalance += diff.coins;
-                
+
                 // Update stats
                 const diffKey = `tasksCompleted${task.difficulty.charAt(0).toUpperCase() + task.difficulty.slice(1)}`;
                 if (appData.stats[diffKey] !== undefined) {
