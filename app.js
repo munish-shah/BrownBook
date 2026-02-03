@@ -1124,6 +1124,32 @@ function renderTasks() {
         row.addEventListener('dragstart', handleDragStart);
         row.addEventListener('dragend', handleDragEnd);
     });
+
+    // Subtask expand/collapse button listeners
+    document.querySelectorAll('.task-expand-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const taskId = btn.dataset.expandId;
+            const container = document.getElementById(`subtasks-${taskId}`);
+            if (container) {
+                container.classList.toggle('open');
+                btn.classList.toggle('expanded');
+            }
+        });
+    });
+
+    // Subtask checkbox listeners
+    document.querySelectorAll('.subtask-checkbox').forEach(cb => {
+        cb.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const parentId = cb.dataset.parentId;
+            const subtaskId = cb.dataset.subtaskId;
+            const taskType = cb.dataset.taskType;
+            if (parentId && subtaskId) {
+                toggleSubtask(e, parentId, subtaskId, taskType);
+            }
+        });
+    });
 }
 
 function createTaskRow(task, isCompleted, inFocusSection = false) {
@@ -1146,13 +1172,13 @@ function createTaskRow(task, isCompleted, inFocusSection = false) {
     let subtasksHtml = '';
     let expandBtn = '';
     if (task.subtasks && task.subtasks.length > 0) {
-        expandBtn = `<button class="task-expand-btn" onclick="toggleSubtasks(event, '${task.id}')">▶</button>`;
+        expandBtn = `<button class="task-expand-btn" data-expand-id="${task.id}">▶</button>`;
         const subtaskRows = task.subtasks.map(st => {
             const stCompleted = st.completed ? 'completed' : '';
             const coinsHtml = task.distributeCoins ? `<span class="subtask-coins">+${st.coins}</span>` : '';
             return `
                 <div class="subtask-row ${stCompleted}" data-id="${st.id}">
-                    <div class="subtask-checkbox ${stCompleted}" onclick="toggleSubtask(event, '${task.id}', '${st.id}', 'task')">
+                    <div class="subtask-checkbox ${stCompleted}" data-parent-id="${task.id}" data-subtask-id="${st.id}" data-task-type="task">
                         ${st.completed ? '✓' : ''}
                     </div>
                     <span class="subtask-title">${escapeHtml(st.title)}</span>
@@ -1214,13 +1240,13 @@ function createRecurringTaskRow(task, isCompleted, inFocusSection = false) {
     let subtasksHtml = '';
     let expandBtn = '';
     if (task.subtasks && task.subtasks.length > 0) {
-        expandBtn = `<button class="task-expand-btn" onclick="toggleSubtasks(event, '${task.id}')">▶</button>`;
+        expandBtn = `<button class="task-expand-btn" data-expand-id="${task.id}">▶</button>`;
         const subtaskRows = task.subtasks.map(st => {
             const stCompleted = st.completed ? 'completed' : '';
             const coinsHtml = task.distributeCoins ? `<span class="subtask-coins">+${st.coins}</span>` : '';
             return `
                 <div class="subtask-row ${stCompleted}" data-id="${st.id}">
-                    <div class="subtask-checkbox ${stCompleted}" onclick="toggleSubtask(event, '${task.id}', '${st.id}', 'recurring')">
+                    <div class="subtask-checkbox ${stCompleted}" data-parent-id="${task.id}" data-subtask-id="${st.id}" data-task-type="recurring">
                         ${st.completed ? '✓' : ''}
                     </div>
                     <span class="subtask-title">${escapeHtml(st.title)}</span>
