@@ -458,6 +458,44 @@ function toggleSubtasks(event, taskId) {
     }
 }
 
+// Validate subtask coin distribution
+function validateSubtaskCoins() {
+    const distribute = document.getElementById('distributeCoinsToggle').checked;
+    const msg = document.getElementById('subtaskValidationMsg');
+
+    if (!distribute) {
+        msg.style.display = 'none';
+        return;
+    }
+
+    const rows = document.querySelectorAll('.subtask-input-row');
+    if (rows.length === 0) {
+        msg.style.display = 'none';
+        return;
+    }
+
+    let subtotal = 0;
+    rows.forEach(row => {
+        const coinInput = row.querySelector('input[type="number"]');
+        if (coinInput) {
+            subtotal += parseInt(coinInput.value) || 0;
+        }
+    });
+
+    const selectedDiff = document.querySelector('.diff-btn.selected');
+    const target = selectedDiff ? parseInt(selectedDiff.dataset.coins) : 25;
+
+    if (subtotal !== target) {
+        msg.textContent = `Total: ${subtotal}/${target} coins`;
+        msg.style.color = '#ef4444';
+        msg.style.display = 'block';
+    } else {
+        msg.textContent = `Total: ${subtotal}/${target} coins ✓`;
+        msg.style.color = '#22c55e';
+        msg.style.display = 'block';
+    }
+}
+
 // Add logic to setupEventListeners for adding subtasks in UI
 function setupEventListeners() {
     // Add Subtask Button
