@@ -403,7 +403,7 @@ async function toggleSubtask(event, parentId, subtaskId, type) {
             const completed = task.subtasks.filter(s => s.completed).length;
             const percent = Math.round((completed / total) * 100);
             progressBar.style.width = `${percent}%`;
-            progressText.textContent = `${completed}/${total}`;
+            progressText.textContent = `${completed}/${total} (${percent}%)`;
         }
     }
 
@@ -1305,8 +1305,10 @@ function createTaskRow(task, isCompleted, inFocusSection = false) {
         const progressPercent = Math.round((completedCount / subtaskCount) * 100);
         progressHtml = `
             <div class="subtask-progress">
-                <div class="subtask-progress-bar" style="width: ${progressPercent}%"></div>
-                <span class="subtask-progress-text">${completedCount}/${subtaskCount}</span>
+                <div class="subtask-progress-track">
+                    <div class="subtask-progress-bar" style="width: ${progressPercent}%"></div>
+                </div>
+                <span class="subtask-progress-text">${completedCount}/${subtaskCount} (${progressPercent}%)</span>
             </div>
         `;
     }
@@ -1412,8 +1414,10 @@ function createRecurringTaskRow(task, isCompleted, inFocusSection = false) {
         const progressPercent = Math.round((completedCount / subtaskCount) * 100);
         progressHtml = `
             <div class="subtask-progress">
-                <div class="subtask-progress-bar" style="width: ${progressPercent}%"></div>
-                <span class="subtask-progress-text">${completedCount}/${subtaskCount}</span>
+                <div class="subtask-progress-track">
+                    <div class="subtask-progress-bar" style="width: ${progressPercent}%"></div>
+                </div>
+                <span class="subtask-progress-text">${completedCount}/${subtaskCount} (${progressPercent}%)</span>
             </div>
         `;
     }

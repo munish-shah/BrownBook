@@ -2420,28 +2420,33 @@ input:checked+.slider:before {
 
 /* Subtask Progress Bar */
 .subtask-progress {
-    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.subtask-progress-track {
+    flex: 1;
+    max-width: 80px;
     height: 6px;
     background: var(--border-color);
     border-radius: 3px;
-    margin-top: 6px;
     overflow: hidden;
 }
 
 .subtask-progress-bar {
     height: 100%;
-    background: linear-gradient(90deg, var(--accent-warm), var(--accent-gold));
+    background: linear-gradient(90deg, #22c55e, #4ade80);
     border-radius: 3px;
     transition: width 0.3s ease;
 }
 
 .subtask-progress-text {
-    position: absolute;
-    right: 0;
-    top: -18px;
     font-size: 11px;
     color: var(--text-muted);
     font-weight: 500;
+    white-space: nowrap;
 }
 
 /* Subtask Delete Button */
