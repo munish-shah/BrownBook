@@ -424,9 +424,12 @@ async function toggleSubtask(event, parentId, subtaskId, type) {
             // But we need to ensure it doesn't auto-complete all subtasks again.
             // This is tricky. simpler: If main task is done, toggling a subtask to UNDONE should mark main task UNDONE.
             // For recurring:
-            const historyIndex = appData.completedHistory.findIndex(h =>
-                h.recurringId === parentId && isCompletedToday(new Date(h.completedAt))
-            );
+            const historyIndex = appData.completedHistory.findIndex(h => {
+                if (!h.completedAt || h.recurringId !== parentId) return false;
+                const d = new Date(h.completedAt);
+                if (d.getHours() < 6) d.setDate(d.getDate() - 1);
+                return getDateString(d) === getTodayDateString();
+            });
             if (historyIndex > -1) {
                 // Remove from history (mark incomplete)
                 const entry = appData.completedHistory[historyIndex];
