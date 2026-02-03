@@ -2364,3 +2364,56 @@ input:checked+.slider:before {
     color: var(--accent-gold);
     font-weight: 600;
 }
+
+/* Inline Add Subtask Form */
+.add-subtask-inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+}
+
+.inline-subtask-input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--card-bg);
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+.inline-subtask-input::placeholder {
+    color: var(--text-muted);
+}
+
+.inline-subtask-input:focus {
+    outline: none;
+    border-color: var(--accent-warm);
+}
+
+.inline-subtask-add {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent-warm);
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.1s ease;
+}
+
+.inline-subtask-add:hover {
+    transform: scale(1.05);
+}
+
+.inline-subtask-add:active {
+    transform: scale(0.95);
+}
