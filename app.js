@@ -274,9 +274,10 @@ async function runMigrationsAndCleanup() {
         needsSave = true;
     }
 
-    // One-time fix: Recover deleted "Wash Face (Night)" history
+    // One-time fix: Recover deleted "Wash Face (Night)" history (V2 - Fixes Stats)
     // User accidentally deleted it, causing history to be orphaned.
-    if (!appData.stats.wash_face_recovery_2026_02_14) {
+    // V2 adds backdating of createdAt so stats count correctly for past days.
+    if (!appData.stats.wash_face_recovery_v2_2026_02_14) {
         // 1. Find the NEW active task
         const newWashFace = appData.recurringTasks.find(t =>
             t.title.toLowerCase().includes('wash face') &&
@@ -286,36 +287,56 @@ async function runMigrationsAndCleanup() {
         if (newWashFace) {
             console.log("Found active Wash Face (Night) task:", newWashFace.id);
             let recoveredCount = 0;
+            let earliestDate = new Date();
 
             // 2. Scan history for ORPHANED entries (same name, DIFFERENT ID)
             appData.completedHistory.forEach(h => {
-                if (h.isRecurring && h.recurringId !== newWashFace.id) {
+                if (h.isRecurring) {
                     // Check if it looks like Wash Face (Night)
                     const titleMatch = h.title && h.title.toLowerCase().includes('wash face');
                     const notesMatch = h.notes && h.notes.toLowerCase().includes('night');
 
                     if (titleMatch && notesMatch) {
-                        // 3. Update to new ID
-                        h.recurringId = newWashFace.id;
-                        // Also update title/notes to match exactly just in case
-                        h.title = newWashFace.title;
-                        h.notes = newWashFace.notes;
-                        h.difficulty = newWashFace.difficulty;
-                        recoveredCount++;
+                        // Update earliest date found
+                        if (h.completedAt) {
+                            const d = new Date(h.completedAt);
+                            if (d < earliestDate) earliestDate = d;
+                        }
+
+                        // 3. Update to new ID (if not already matching)
+                        if (h.recurringId !== newWashFace.id) {
+                            h.recurringId = newWashFace.id;
+                            // Also update title/notes to match exactly just in case
+                            h.title = newWashFace.title;
+                            h.notes = newWashFace.notes;
+                            h.difficulty = newWashFace.difficulty;
+                            recoveredCount++;
+                        }
                     }
                 }
             });
 
-            if (recoveredCount > 0) {
-                console.log(`Recovered ${recoveredCount} orphaned history entries for Wash Face (Night).`);
-                alert(`Data Recovery Successful! ♻️\n\nFound and restored ${recoveredCount} historical completions for "Wash Face (Night)".\nYour stats and streaks should be correct now.`);
+            // 4. Backdate the new task so it counts in past stats
+            // We set it to 1 day before the earliest completion found, or defaults to now if none found.
+            // If the current createdAt is AFTER the earliest history, we must pull it back.
+            const currentCreated = new Date(newWashFace.createdAt);
+            if (earliestDate < currentCreated) {
+                // Set to 1 day before earliest history to be safe
+                const newCreated = new Date(earliestDate);
+                newCreated.setDate(newCreated.getDate() - 1);
+                newWashFace.createdAt = newCreated.toISOString();
+                console.log(`Backdated Wash Face task to ${newWashFace.createdAt}`);
                 needsSave = true;
-            } else {
-                console.log("No orphaned Wash Face history found to recover.");
+            }
+
+            if (recoveredCount > 0 || needsSave) {
+                console.log(`Recovered ${recoveredCount} orphaned history entries for Wash Face (Night). Backdated creation.`);
+                alert(`Data Recovery V2 Successful! ♻️\n\nRestored ${recoveredCount} historical completions and fixed the timeline for "Wash Face (Night)".\nYour progress bars should now be correct.`);
+                needsSave = true;
             }
 
             // Mark as done so we don't annoy the user every time
-            appData.stats.wash_face_recovery_2026_02_14 = true;
+            appData.stats.wash_face_recovery_v2_2026_02_14 = true;
             needsSave = true; // save the flag at minimum
         } else {
             console.log("Could not find active Wash Face (Night) task to recover into.");
