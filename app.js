@@ -274,6 +274,54 @@ async function runMigrationsAndCleanup() {
         needsSave = true;
     }
 
+    // One-time fix: Recover deleted "Wash Face (Night)" history
+    // User accidentally deleted it, causing history to be orphaned.
+    if (!appData.stats.wash_face_recovery_2026_02_14) {
+        // 1. Find the NEW active task
+        const newWashFace = appData.recurringTasks.find(t =>
+            t.title.toLowerCase().includes('wash face') &&
+            (t.notes && t.notes.toLowerCase().includes('night'))
+        );
+
+        if (newWashFace) {
+            console.log("Found active Wash Face (Night) task:", newWashFace.id);
+            let recoveredCount = 0;
+
+            // 2. Scan history for ORPHANED entries (same name, DIFFERENT ID)
+            appData.completedHistory.forEach(h => {
+                if (h.isRecurring && h.recurringId !== newWashFace.id) {
+                    // Check if it looks like Wash Face (Night)
+                    const titleMatch = h.title && h.title.toLowerCase().includes('wash face');
+                    const notesMatch = h.notes && h.notes.toLowerCase().includes('night');
+
+                    if (titleMatch && notesMatch) {
+                        // 3. Update to new ID
+                        h.recurringId = newWashFace.id;
+                        // Also update title/notes to match exactly just in case
+                        h.title = newWashFace.title;
+                        h.notes = newWashFace.notes;
+                        h.difficulty = newWashFace.difficulty;
+                        recoveredCount++;
+                    }
+                }
+            });
+
+            if (recoveredCount > 0) {
+                console.log(`Recovered ${recoveredCount} orphaned history entries for Wash Face (Night).`);
+                alert(`Data Recovery Successful! ♻️\n\nFound and restored ${recoveredCount} historical completions for "Wash Face (Night)".\nYour stats and streaks should be correct now.`);
+                needsSave = true;
+            } else {
+                console.log("No orphaned Wash Face history found to recover.");
+            }
+
+            // Mark as done so we don't annoy the user every time
+            appData.stats.wash_face_recovery_2026_02_14 = true;
+            needsSave = true; // save the flag at minimum
+        } else {
+            console.log("Could not find active Wash Face (Night) task to recover into.");
+        }
+    }
+
     // Cleanup: Sync History with Recurrence State
     // If it's in history for TODAY but NOT in recurringCompletions, it means it was unchecked (but history delete failed).
     // So we should REMOVE it from History.
