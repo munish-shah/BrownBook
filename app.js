@@ -1076,7 +1076,7 @@ function renderTasks() {
     });
 
     // Filter recurring tasks - only show interval tasks on active days
-    const visibleRecurringTasks = appData.recurringTasks.filter(t => shouldShowIntervalTask(t));
+    const visibleRecurringTasks = appData.recurringTasks.filter(t => !t.deleted && shouldShowIntervalTask(t));
 
     // Separate visible recurring tasks into completed and not completed for today
     const recurringNotCompleted = visibleRecurringTasks.filter(t => !isRecurringCompletedToday(t.id));
@@ -1762,9 +1762,18 @@ function toggleRecurringTask(id) {
 }
 
 function deleteRecurringTask(id) {
-    appData.recurringTasks = appData.recurringTasks.filter(t => t.id !== id);
-    // Also clear any completion data for this task
+    // Soft delete: mark as deleted instead of removing, so history is preserved in progress
+    const task = appData.recurringTasks.find(t => t.id === id);
+    if (task) {
+        task.deleted = true;
+        task.deletedAt = new Date().toISOString();
+    }
+    // Clear today's completion checkbox state
     delete appData.recurringCompletions[id];
+    // Remove from focus pins if pinned
+    if (appData.focusPinnedIds) {
+        appData.focusPinnedIds = appData.focusPinnedIds.filter(pid => pid !== id);
+    }
     saveData();
     renderTasks();
 }
@@ -2473,7 +2482,7 @@ function renderProgress() {
             <div class="summary-label">Best ${periodLabel}</div>
         </div>
         <div class="summary-card">
-            <div class="summary-value">${appData.recurringTasks.length}</div>
+            <div class="summary-value">${appData.recurringTasks.filter(t => !t.deleted).length}</div>
             <div class="summary-label">Recurring Tasks</div>
         </div>
     `;
@@ -2552,6 +2561,15 @@ function isTaskActiveOnDate(task, date) {
         const createdDate = new Date(task.createdAt);
         createdDate.setHours(0, 0, 0, 0);
         if (checkDate < createdDate) {
+            return false;
+        }
+    }
+
+    // Task was soft-deleted: not active on or after deletion date
+    if (task.deletedAt) {
+        const deletedDate = new Date(task.deletedAt);
+        deletedDate.setHours(0, 0, 0, 0);
+        if (checkDate >= deletedDate) {
             return false;
         }
     }
