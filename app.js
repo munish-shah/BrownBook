@@ -274,6 +274,43 @@ async function runMigrationsAndCleanup() {
         needsSave = true;
     }
 
+    // One-time fix: Add missing PREP completion for Feb 17, 2026
+    if (!appData.stats.prep_feb17_fix) {
+        const prepTask = appData.recurringTasks.find(t =>
+            t.title && t.title.toUpperCase().includes('PREP')
+        );
+
+        if (prepTask) {
+            const feb17Timestamp = '2026-02-18T04:00:00.000Z'; // Before 6AM reset = counts as Feb 17
+            const fixId = 'fix_prep_feb17';
+
+            const exists = appData.completedHistory.some(h => h.id === fixId);
+            if (!exists) {
+                appData.completedHistory.push({
+                    id: fixId,
+                    recurringId: prepTask.id,
+                    title: prepTask.title,
+                    notes: prepTask.notes,
+                    difficulty: prepTask.difficulty,
+                    isRecurring: true,
+                    completed: true,
+                    completedAt: feb17Timestamp
+                });
+
+                // Award the coins that were missed
+                const coins = DIFFICULTIES[prepTask.difficulty].coins;
+                appData.stats.totalCoinsEarned += coins;
+                appData.stats.currentBalance += coins;
+                incrementTaskCount(prepTask.difficulty);
+
+                console.log(`Added missing PREP completion for Feb 17 + ${coins} coins.`);
+                alert(`🎉 Fix Applied!\n\nAdded missing PREP completion for Feb 17 and awarded ${coins} coins.`);
+            }
+        }
+        appData.stats.prep_feb17_fix = true;
+        needsSave = true;
+    }
+
 
 
     // Cleanup: Sync History with Recurrence State
