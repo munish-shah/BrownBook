@@ -174,43 +174,7 @@ async function runMigrationsAndCleanup() {
     // Clear stale recurring completions
     const today = getTodayDateString();
 
-    // One-time fix: Add missing Wash Face (Night) completion for Feb 23, 2026
-    if (!appData.stats.wash_face_feb23_fix) {
-        const washFaceTask = (appData.recurringTasks || []).find(t =>
-            t.title && t.title.toLowerCase().includes('wash face') &&
-            (t.title.toLowerCase().includes('night') || (t.notes && t.notes.toLowerCase().includes('night')))
-        );
 
-        if (washFaceTask) {
-            const feb23Timestamp = '2026-02-24T04:00:00.000Z'; // Counts as Feb 23
-            const fixId = 'fix_wash_face_feb23';
-
-            const exists = (appData.completedHistory || []).some(h => h.id === fixId);
-            if (!exists) {
-                appData.completedHistory.unshift({
-                    id: fixId,
-                    recurringId: washFaceTask.id,
-                    title: washFaceTask.title,
-                    notes: washFaceTask.notes,
-                    difficulty: washFaceTask.difficulty,
-                    isRecurring: true,
-                    completed: true,
-                    completedAt: feb23Timestamp
-                });
-
-                const coins = DIFFICULTIES[washFaceTask.difficulty].coins;
-                appData.stats.totalCoinsEarned += coins;
-                appData.stats.currentBalance += coins;
-                incrementTaskCount(washFaceTask.difficulty);
-
-                console.log(`Added missing Wash Face (Night) completion for Feb 23 + ${coins} coins.`);
-                alert(`🎉 Fix Applied!\n\nAdded missing Wash Face (Night) completion for Feb 23 and awarded ${coins} coins.`);
-                needsSave = true;
-            }
-        }
-        appData.stats.wash_face_feb23_fix = true;
-        needsSave = true;
-    }
 
 
 
