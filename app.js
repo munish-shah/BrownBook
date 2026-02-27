@@ -72,12 +72,68 @@ let currentShopItemToClaim = null;
 let isFirstLoad = true;
 
 // Initialize app with Firebase
+// ========== Theme Switcher ==========
+function applyTheme(themeName) {
+    if (themeName === 'default') {
+        document.documentElement.removeAttribute('data-theme');
+    } else {
+        document.documentElement.setAttribute('data-theme', themeName);
+    }
+    // Highlight active swatch
+    document.querySelectorAll('.theme-swatch').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.themeValue === themeName);
+    });
+}
+
+function setupThemePicker() {
+    const btn = document.getElementById('themePickerBtn');
+    const popup = document.getElementById('themePickerPopup');
+    if (!btn || !popup) return;
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        popup.style.display = popup.style.display === 'none' ? 'block' : 'none';
+    });
+
+    popup.addEventListener('click', (e) => e.stopPropagation());
+
+    document.addEventListener('click', () => {
+        popup.style.display = 'none';
+    });
+
+    popup.querySelectorAll('.theme-swatch').forEach(swatch => {
+        swatch.addEventListener('click', () => {
+            const theme = swatch.dataset.themeValue;
+            applyTheme(theme);
+            localStorage.setItem('brownbook-theme', theme);
+            // Also persist to Firebase if available
+            if (appData && appData.settings !== undefined) {
+                appData.settings.theme = theme;
+                saveData();
+            } else if (appData) {
+                appData.settings = { theme };
+                saveData();
+            }
+            popup.style.display = 'none';
+        });
+    });
+}
+
+// Load theme immediately (before Firebase) from localStorage
+(function () {
+    const savedTheme = localStorage.getItem('brownbook-theme');
+    if (savedTheme && savedTheme !== 'default') {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+})();
+
 async function init() {
     // Initialize Lucide icons for static HTML elements
     if (typeof lucide !== 'undefined') lucide.createIcons();
 
     setupEventListeners();
     setupKeyManagement(); // Setup the new key UI
+    setupThemePicker(); // Setup theme switcher
 
     console.log("Using Secret Key:", SECRET_KEY);
 
@@ -109,6 +165,12 @@ async function init() {
             }
 
             renderAll();
+
+            // Sync theme from Firebase
+            if (appData.settings && appData.settings.theme) {
+                applyTheme(appData.settings.theme);
+                localStorage.setItem('brownbook-theme', appData.settings.theme);
+            }
         } else {
             // New user or empty db
             console.log("No data found for this key, starting fresh.");

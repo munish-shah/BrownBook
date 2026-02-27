@@ -84,6 +84,41 @@
                     style="display: none; font-size: 16px; margin-top: 10px; background: none; border: none; padding: 4px; cursor: pointer; opacity: 0.6;">
                     <i data-lucide="download" class="icon icon-gold"></i>
                 </button>
+                <!-- Theme Picker Button -->
+                <button class="btn-theme-picker" id="themePickerBtn" title="Change Theme"
+                    style="font-size: 16px; margin-top: 10px; background: none; border: none; padding: 4px; cursor: pointer; opacity: 0.6;">
+                    <i data-lucide="palette" class="icon icon-gold"></i>
+                </button>
+                <!-- Theme Picker Popup -->
+                <div class="theme-picker-popup" id="themePickerPopup" style="display:none;">
+                    <div class="theme-picker-title">Choose Theme</div>
+                    <div class="theme-picker-grid">
+                        <button class="theme-swatch" data-theme-value="default" title="Warm Beige">
+                            <span class="swatch-color" style="background:#F5A623;"></span>
+                            <span class="swatch-name">Warm Beige</span>
+                        </button>
+                        <button class="theme-swatch" data-theme-value="midnight" title="Midnight Dark">
+                            <span class="swatch-color" style="background:#4A9FFF;"></span>
+                            <span class="swatch-name">Midnight</span>
+                        </button>
+                        <button class="theme-swatch" data-theme-value="forest" title="Forest Zen">
+                            <span class="swatch-color" style="background:#2D9B6E;"></span>
+                            <span class="swatch-name">Forest</span>
+                        </button>
+                        <button class="theme-swatch" data-theme-value="ocean" title="Ocean Breeze">
+                            <span class="swatch-color" style="background:#3B82F6;"></span>
+                            <span class="swatch-name">Ocean</span>
+                        </button>
+                        <button class="theme-swatch" data-theme-value="rose" title="Rose Dusk">
+                            <span class="swatch-color" style="background:#E8546C;"></span>
+                            <span class="swatch-name">Rose</span>
+                        </button>
+                        <button class="theme-swatch" data-theme-value="charcoal" title="Charcoal Gold">
+                            <span class="swatch-color" style="background:#FFD700;"></span>
+                            <span class="swatch-name">Charcoal</span>
+                        </button>
+                    </div>
+                </div>
                 <!-- Sync/Key Button -->
                 <button class="btn-sync-key" id="manageKeyBtn" title="Link Device / Secret Key"
                     style="font-size: 16px; margin-top: 10px; background: none; border: none; padding: 4px; cursor: pointer; opacity: 0.6;">

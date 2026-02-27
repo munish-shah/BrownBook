@@ -134,19 +134,110 @@
     --radius-full: 9999px;
 }
 
-/* Dark mode */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --bg-primary: #1A1816;
-        --bg-secondary: #211E1B;
-        --bg-sidebar: #1F1C19;
-        --card-bg: #292522;
-        --text-primary: #EEE;
-        --text-secondary: #AAA;
-        --text-muted: #777;
-        --border-color: #3A3530;
-        --input-bg: #2A2724;
-    }
+/* ===== Theme: Midnight Dark ===== */
+[data-theme="midnight"] {
+    --bg-primary: #1A1A2E;
+    --bg-secondary: #16213E;
+    --bg-sidebar: #16213E;
+    --card-bg: #222244;
+    --accent-warm: #4A9FFF;
+    --accent-warm-dark: #3578CC;
+    --accent-gold: #4A9FFF;
+    --accent-gold-dark: #3578CC;
+    --coin-center: #FFFFFF;
+    --success-green: #66BB6A;
+    --success-green-dark: #4CAF50;
+    --text-primary: #E8E8F0;
+    --text-secondary: #A0A0B8;
+    --text-muted: #6C6C84;
+    --border-color: #2E2E4A;
+    --input-bg: #252545;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* ===== Theme: Forest Zen ===== */
+[data-theme="forest"] {
+    --bg-primary: #F0F4EF;
+    --bg-secondary: #E2EBE0;
+    --bg-sidebar: #E2EBE0;
+    --card-bg: #FAFCF9;
+    --accent-warm: #2D9B6E;
+    --accent-warm-dark: #1E7A52;
+    --accent-gold: #2D9B6E;
+    --accent-gold-dark: #1E7A52;
+    --coin-center: #FFFFFF;
+    --success-green: #43A047;
+    --success-green-dark: #388E3C;
+    --text-primary: #2C3E2D;
+    --text-secondary: #5A6E5C;
+    --text-muted: #8A9A8C;
+    --border-color: #C8D8C6;
+    --input-bg: #E8F0E6;
+}
+
+/* ===== Theme: Ocean Breeze ===== */
+[data-theme="ocean"] {
+    --bg-primary: #F0F4F8;
+    --bg-secondary: #E2E8F0;
+    --bg-sidebar: #E2E8F0;
+    --card-bg: #FFFFFF;
+    --accent-warm: #3B82F6;
+    --accent-warm-dark: #2563EB;
+    --accent-gold: #3B82F6;
+    --accent-gold-dark: #2563EB;
+    --coin-center: #FFFFFF;
+    --success-green: #22C55E;
+    --success-green-dark: #16A34A;
+    --text-primary: #1E293B;
+    --text-secondary: #64748B;
+    --text-muted: #94A3B8;
+    --border-color: #CBD5E1;
+    --input-bg: #E8ECF2;
+}
+
+/* ===== Theme: Rose Dusk ===== */
+[data-theme="rose"] {
+    --bg-primary: #FDF2F4;
+    --bg-secondary: #F5E1E6;
+    --bg-sidebar: #F5E1E6;
+    --card-bg: #FFFBFC;
+    --accent-warm: #E8546C;
+    --accent-warm-dark: #C93D55;
+    --accent-gold: #E8546C;
+    --accent-gold-dark: #C93D55;
+    --coin-center: #FFFFFF;
+    --success-green: #66BB6A;
+    --success-green-dark: #4CAF50;
+    --text-primary: #3D2833;
+    --text-secondary: #7A5C66;
+    --text-muted: #A8909A;
+    --border-color: #E8CDD4;
+    --input-bg: #F5E8EC;
+}
+
+/* ===== Theme: Charcoal Gold ===== */
+[data-theme="charcoal"] {
+    --bg-primary: #1C1C1E;
+    --bg-secondary: #2C2C2E;
+    --bg-sidebar: #2C2C2E;
+    --card-bg: #3A3A3C;
+    --accent-warm: #FFD700;
+    --accent-warm-dark: #CCB000;
+    --accent-gold: #FFD700;
+    --accent-gold-dark: #CCB000;
+    --coin-center: #1C1C1E;
+    --success-green: #66BB6A;
+    --success-green-dark: #4CAF50;
+    --text-primary: #F5F5F0;
+    --text-secondary: #B0B0A8;
+    --text-muted: #757570;
+    --border-color: #4A4A4C;
+    --input-bg: #333335;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 * {
@@ -906,6 +997,74 @@ body {
 .claimed-label {
     color: var(--text-secondary);
     font-size: 14px;
+}
+
+/* Theme Picker */
+.theme-picker-popup {
+    position: absolute;
+    bottom: 50px;
+    left: 10px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    box-shadow: var(--shadow-lg);
+    z-index: 100;
+    min-width: 200px;
+}
+
+.theme-picker-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+    text-align: center;
+}
+
+.theme-picker-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.theme-swatch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--card-bg);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.theme-swatch:hover {
+    border-color: var(--accent-warm);
+    transform: scale(1.03);
+}
+
+.theme-swatch.active {
+    border-color: var(--accent-warm);
+    box-shadow: 0 0 0 2px rgba(245, 166, 35, 0.3);
+}
+
+.swatch-color {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.swatch-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.sidebar-footer {
+    position: relative;
 }
 
 /* Modals */
