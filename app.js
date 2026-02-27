@@ -1068,6 +1068,14 @@ function renderTasks() {
     ).join('');
     document.getElementById('todayCompletedTaskList').innerHTML = todayCompletedHTML;
 
+    // Update recurring streak badge
+    const streak = calculateRecurringStreak();
+    const streakBadge = document.getElementById('recurringStreakBadge');
+    if (streakBadge) {
+        streakBadge.textContent = streak > 0 ? `🔥 ${streak}` : '';
+        streakBadge.style.display = streak > 0 ? 'inline' : 'none';
+    }
+
     // Add event listeners
     document.querySelectorAll('.task-checkbox:not(.recurring):not(.completed-task)').forEach(cb => {
         cb.addEventListener('click', () => toggleTask(cb.dataset.id));
@@ -2387,6 +2395,10 @@ function renderProgress() {
             <div class="summary-value">${appData.recurringTasks.filter(t => !t.deleted).length}</div>
             <div class="summary-label">Recurring Tasks</div>
         </div>
+        <div class="summary-card">
+            <div class="summary-value streak-value">${calculateRecurringStreak()} 🔥</div>
+            <div class="summary-label">Current Streak</div>
+        </div>
     `;
 }
 
@@ -2498,6 +2510,62 @@ function isTaskActiveOnDate(task, date) {
     }
 
     return true;
+}
+
+// Calculate the current recurring task streak (consecutive days at 100%)
+function calculateRecurringStreak() {
+    const recurringTasks = appData.recurringTasks || [];
+    if (recurringTasks.length === 0) return 0;
+
+    const recurringHistory = (appData.completedHistory || []).filter(t => t.isRecurring);
+    const today = getTodayDateString();
+    let streak = 0;
+
+    // Check today first: are ALL active (non-deleted) recurring tasks completed?
+    const todayDate = new Date();
+    if (todayDate.getHours() < 6) todayDate.setDate(todayDate.getDate() - 1);
+    const activeTodayTasks = recurringTasks.filter(t => !t.deleted && isTaskActiveOnDate(t, todayDate));
+
+    if (activeTodayTasks.length > 0) {
+        const allCompletedToday = activeTodayTasks.every(t => isRecurringCompletedToday(t.id));
+        if (allCompletedToday) {
+            streak = 1;
+        }
+    }
+
+    // Walk backwards from yesterday, checking each day
+    for (let i = 1; i <= 365; i++) {
+        const date = new Date(todayDate);
+        date.setDate(date.getDate() - i);
+        const dateStr = getDateString(date);
+
+        // Get tasks that were active on this day
+        const activeOnDay = recurringTasks.filter(t => isTaskActiveOnDate(t, date));
+        if (activeOnDay.length === 0) continue; // No tasks scheduled, skip (don't break streak)
+
+        const activeIds = activeOnDay.map(t => t.id);
+
+        // Find which of those were completed
+        const completedOnDay = new Set();
+        recurringHistory.forEach(h => {
+            if (h.completedAt && h.recurringId) {
+                const hDate = new Date(h.completedAt);
+                if (hDate.getHours() < 6) hDate.setDate(hDate.getDate() - 1);
+                if (getDateString(hDate) === dateStr && activeIds.includes(h.recurringId)) {
+                    completedOnDay.add(h.recurringId);
+                }
+            }
+        });
+
+        // Were ALL active tasks completed?
+        if (completedOnDay.size >= activeOnDay.length) {
+            streak++;
+        } else {
+            break; // Streak broken
+        }
+    }
+
+    return streak;
 }
 
 function calculateRecurringConsistency(range) {

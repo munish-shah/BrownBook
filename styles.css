@@ -288,6 +288,23 @@ body {
     margin-bottom: 12px;
 }
 
+.streak-badge {
+    font-size: 11px;
+    font-weight: 700;
+    color: #ff9500;
+    background: rgba(255, 149, 0, 0.12);
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 0;
+    text-transform: none;
+    vertical-align: middle;
+    margin-left: 4px;
+}
+
+.streak-value {
+    color: #ff9500 !important;
+}
+
 .task-list {
     display: flex;
     flex-direction: column;
