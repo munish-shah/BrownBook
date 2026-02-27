@@ -93,27 +93,27 @@
 }
 
 :root {
-    /* Color palette - Warm, inviting */
-    --bg-primary: #FDF6E3;
-    --bg-secondary: #FAF0D7;
-    --bg-sidebar: #F7EED5;
-    --card-bg: #FFFFFF;
+    /* Default: Dark Warm */
+    --bg-primary: #1A1816;
+    --bg-secondary: #211E1B;
+    --bg-sidebar: #1F1C19;
+    --card-bg: #292522;
 
     --accent-warm: #F5A623;
     --accent-warm-dark: #D4890A;
     --accent-gold: #F9B823;
     --accent-gold-dark: #D99311;
-    --coin-center: #664422;
+    --coin-center: #1A1816;
 
     --success-green: #7CB342;
     --success-green-dark: #669B2E;
 
-    --text-primary: #4A4035;
-    --text-secondary: #81776B;
-    --text-muted: #A89F93;
+    --text-primary: #EEE;
+    --text-secondary: #AAA;
+    --text-muted: #777;
 
-    --border-color: #E5DDD0;
-    --input-bg: #F8F5F0;
+    --border-color: #3A3530;
+    --input-bg: #2A2724;
 
     /* Difficulty colors */
     --diff-quick: #4CAF50;
@@ -123,9 +123,9 @@
     --diff-epic: #E75757;
 
     /* Shadows */
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
 
     /* Border radius */
     --radius-sm: 8px;
@@ -134,7 +134,7 @@
     --radius-full: 9999px;
 }
 
-/* ===== Theme: Midnight Dark ===== */
+/* ===== Theme: Midnight ===== */
 [data-theme="midnight"] {
     --bg-primary: #1A1A2E;
     --bg-secondary: #16213E;
@@ -144,7 +144,7 @@
     --accent-warm-dark: #3578CC;
     --accent-gold: #4A9FFF;
     --accent-gold-dark: #3578CC;
-    --coin-center: #FFFFFF;
+    --coin-center: #1A1A2E;
     --success-green: #66BB6A;
     --success-green-dark: #4CAF50;
     --text-primary: #E8E8F0;
@@ -152,69 +152,66 @@
     --text-muted: #6C6C84;
     --border-color: #2E2E4A;
     --input-bg: #252545;
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
-    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
-/* ===== Theme: Forest Zen ===== */
+/* ===== Theme: Dark Forest ===== */
 [data-theme="forest"] {
-    --bg-primary: #F0F4EF;
-    --bg-secondary: #E2EBE0;
-    --bg-sidebar: #E2EBE0;
-    --card-bg: #FAFCF9;
-    --accent-warm: #2D9B6E;
-    --accent-warm-dark: #1E7A52;
-    --accent-gold: #2D9B6E;
-    --accent-gold-dark: #1E7A52;
-    --coin-center: #FFFFFF;
-    --success-green: #43A047;
-    --success-green-dark: #388E3C;
-    --text-primary: #2C3E2D;
-    --text-secondary: #5A6E5C;
-    --text-muted: #8A9A8C;
-    --border-color: #C8D8C6;
-    --input-bg: #E8F0E6;
-}
-
-/* ===== Theme: Ocean Breeze ===== */
-[data-theme="ocean"] {
-    --bg-primary: #F0F4F8;
-    --bg-secondary: #E2E8F0;
-    --bg-sidebar: #E2E8F0;
-    --card-bg: #FFFFFF;
-    --accent-warm: #3B82F6;
-    --accent-warm-dark: #2563EB;
-    --accent-gold: #3B82F6;
-    --accent-gold-dark: #2563EB;
-    --coin-center: #FFFFFF;
-    --success-green: #22C55E;
-    --success-green-dark: #16A34A;
-    --text-primary: #1E293B;
-    --text-secondary: #64748B;
-    --text-muted: #94A3B8;
-    --border-color: #CBD5E1;
-    --input-bg: #E8ECF2;
-}
-
-/* ===== Theme: Rose Dusk ===== */
-[data-theme="rose"] {
-    --bg-primary: #FDF2F4;
-    --bg-secondary: #F5E1E6;
-    --bg-sidebar: #F5E1E6;
-    --card-bg: #FFFBFC;
-    --accent-warm: #E8546C;
-    --accent-warm-dark: #C93D55;
-    --accent-gold: #E8546C;
-    --accent-gold-dark: #C93D55;
-    --coin-center: #FFFFFF;
+    --bg-primary: #141E14;
+    --bg-secondary: #1A261A;
+    --bg-sidebar: #1A261A;
+    --card-bg: #223322;
+    --accent-warm: #4ADE80;
+    --accent-warm-dark: #22C55E;
+    --accent-gold: #4ADE80;
+    --accent-gold-dark: #22C55E;
+    --coin-center: #141E14;
     --success-green: #66BB6A;
     --success-green-dark: #4CAF50;
-    --text-primary: #3D2833;
-    --text-secondary: #7A5C66;
-    --text-muted: #A8909A;
-    --border-color: #E8CDD4;
-    --input-bg: #F5E8EC;
+    --text-primary: #D8ECD8;
+    --text-secondary: #8AB88A;
+    --text-muted: #5A7A5A;
+    --border-color: #2A3E2A;
+    --input-bg: #1E2E1E;
+}
+
+/* ===== Theme: Dark Ocean ===== */
+[data-theme="ocean"] {
+    --bg-primary: #0F1923;
+    --bg-secondary: #142230;
+    --bg-sidebar: #142230;
+    --card-bg: #1C2E3E;
+    --accent-warm: #38BDF8;
+    --accent-warm-dark: #0EA5E9;
+    --accent-gold: #38BDF8;
+    --accent-gold-dark: #0EA5E9;
+    --coin-center: #0F1923;
+    --success-green: #34D399;
+    --success-green-dark: #10B981;
+    --text-primary: #E0EAF0;
+    --text-secondary: #7AA0BB;
+    --text-muted: #4A7090;
+    --border-color: #253545;
+    --input-bg: #182838;
+}
+
+/* ===== Theme: Dark Rose ===== */
+[data-theme="rose"] {
+    --bg-primary: #1E1418;
+    --bg-secondary: #2A1C22;
+    --bg-sidebar: #2A1C22;
+    --card-bg: #3A2530;
+    --accent-warm: #F472B6;
+    --accent-warm-dark: #EC4899;
+    --accent-gold: #F472B6;
+    --accent-gold-dark: #EC4899;
+    --coin-center: #1E1418;
+    --success-green: #66BB6A;
+    --success-green-dark: #4CAF50;
+    --text-primary: #F0DDE4;
+    --text-secondary: #B08898;
+    --text-muted: #806070;
+    --border-color: #48303C;
+    --input-bg: #2E1E28;
 }
 
 /* ===== Theme: Charcoal Gold ===== */
@@ -235,9 +232,46 @@
     --text-muted: #757570;
     --border-color: #4A4A4C;
     --input-bg: #333335;
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
-    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* ===== Theme: Obsidian ===== */
+[data-theme="obsidian"] {
+    --bg-primary: #0A0A0A;
+    --bg-secondary: #111111;
+    --bg-sidebar: #111111;
+    --card-bg: #1A1A1A;
+    --accent-warm: #A0A0A0;
+    --accent-warm-dark: #808080;
+    --accent-gold: #C0C0C0;
+    --accent-gold-dark: #A0A0A0;
+    --coin-center: #0A0A0A;
+    --success-green: #66BB6A;
+    --success-green-dark: #4CAF50;
+    --text-primary: #E0E0E0;
+    --text-secondary: #888888;
+    --text-muted: #555555;
+    --border-color: #2A2A2A;
+    --input-bg: #151515;
+}
+
+/* ===== Theme: Neon Cyber ===== */
+[data-theme="cyber"] {
+    --bg-primary: #0D0D1A;
+    --bg-secondary: #12122A;
+    --bg-sidebar: #12122A;
+    --card-bg: #1A1A35;
+    --accent-warm: #BF5AF2;
+    --accent-warm-dark: #9B3DD8;
+    --accent-gold: #BF5AF2;
+    --accent-gold-dark: #9B3DD8;
+    --coin-center: #0D0D1A;
+    --success-green: #30D158;
+    --success-green-dark: #28B74C;
+    --text-primary: #E8E0F0;
+    --text-secondary: #9585A8;
+    --text-muted: #605570;
+    --border-color: #2A2A4A;
+    --input-bg: #161630;
 }
 
 * {
@@ -1010,7 +1044,7 @@ body {
     padding: 16px;
     box-shadow: var(--shadow-lg);
     z-index: 100;
-    min-width: 200px;
+    min-width: 240px;
 }
 
 .theme-picker-title {
