@@ -393,10 +393,11 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    line-height: 1;
 }
 
 .streak-badge .icon {
-    vertical-align: initial;
+    display: block;
 }
 
 .streak-value {
