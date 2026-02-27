@@ -73,12 +73,21 @@ let isFirstLoad = true;
 
 // Initialize app with Firebase
 // ========== Theme Switcher ==========
+const THEME_COLORS = {
+    default: '#1A1816', midnight: '#1A1A2E', forest: '#141E14',
+    ocean: '#0F1923', rose: '#1E1418', charcoal: '#1C1C1E',
+    obsidian: '#0A0A0A', cyber: '#0D0D1A', ember: '#1A1210', slate: '#15191E'
+};
+
 function applyTheme(themeName) {
     if (themeName === 'default') {
         document.documentElement.removeAttribute('data-theme');
     } else {
         document.documentElement.setAttribute('data-theme', themeName);
     }
+    // Update title bar color
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', THEME_COLORS[themeName] || THEME_COLORS.default);
     // Highlight active swatch
     document.querySelectorAll('.theme-swatch').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.themeValue === themeName);
