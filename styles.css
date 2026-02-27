@@ -5,7 +5,7 @@
     width: 16px;
     height: 16px;
     display: inline-block;
-    vertical-align: -0.125em;
+    vertical-align: middle;
     stroke-width: 2;
 }
 
@@ -265,7 +265,8 @@ body {
 }
 
 .tab-icon {
-    font-size: 18px;
+    display: flex;
+    align-items: center;
 }
 
 .sidebar-footer {
@@ -369,6 +370,9 @@ body {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .streak-badge {

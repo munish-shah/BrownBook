@@ -2069,7 +2069,7 @@ function createShopItemCard(item, saleActive = false) {
             <div class="shop-item-info">
                 <div class="shop-item-name">${escapeHtml(item.name)}</div>
                 <div class="shop-item-price">
-                    <span class="coin-icon"><i data-lucide="coins" class="icon icon-gold"></i></span>
+                    <span class="coin-icon"><i data-lucide="circle-dollar-sign" class="icon icon-gold"></i></span>
                     ${priceDisplay}
                     ${scalingInfo}
                 </div>
@@ -2096,7 +2096,7 @@ function createRewardCard(reward) {
             ${reward.description ? `<div class="reward-desc">${escapeHtml(reward.description)}</div>` : ''}
             <div class="reward-footer">
                 <div class="reward-cost">
-                    <span class="coin-icon"><i data-lucide="coins" class="icon icon-gold"></i></span>
+                    <span class="coin-icon"><i data-lucide="circle-dollar-sign" class="icon icon-gold"></i></span>
                     <span>${reward.cost}</span>
                 </div>
                 <button class="claim-btn ${canAfford ? 'can-claim' : 'cannot-claim'}" data-id="${reward.id}" ${!canAfford ? 'disabled' : ''}>
