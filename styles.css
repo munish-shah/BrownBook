@@ -314,6 +314,71 @@
     --input-bg: #1E242C;
 }
 
+/* ===== Theme: Mocha ===== */
+[data-theme="mocha"] {
+    --bg-primary: #1E1714;
+    --bg-secondary: #2A211C;
+    --bg-sidebar: #2A211C;
+    --card-bg: #382E28;
+    --accent-warm: #D4915E;
+    --accent-warm-dark: #B87A4A;
+    --accent-gold: #D4915E;
+    --accent-gold-dark: #B87A4A;
+    --coin-center: #1E1714;
+    --success-green: #7CB342;
+    --success-green-dark: #669B2E;
+    --text-primary: #EDE0D4;
+    --text-secondary: #A8957E;
+    --text-muted: #6E6050;
+    --border-color: #44382F;
+    --input-bg: #2E251F;
+}
+
+/* ===== Theme: Aurora ===== */
+[data-theme="aurora"] {
+    --bg-primary: #0E1A1A;
+    --bg-secondary: #142424;
+    --bg-sidebar: #142424;
+    --card-bg: #1C3030;
+    --accent-warm: #5EEAD4;
+    --accent-warm-dark: #2DD4BF;
+    --accent-gold: #5EEAD4;
+    --accent-gold-dark: #2DD4BF;
+    --coin-center: #0E1A1A;
+    --success-green: #4ADE80;
+    --success-green-dark: #22C55E;
+    --text-primary: #D8F0E8;
+    --text-secondary: #7AB8A8;
+    --text-muted: #4A8070;
+    --border-color: #264040;
+    --input-bg: #182C2C;
+}
+
+/* ===== Custom Scrollbar ===== */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* Firefox scrollbar */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) var(--bg-primary);
+}
+
 * {
     margin: 0;
     padding: 0;
