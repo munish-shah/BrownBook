@@ -116,12 +116,10 @@ function setupThemePicker() {
             const theme = swatch.dataset.themeValue;
             applyTheme(theme);
             localStorage.setItem('brownbook-theme', theme);
-            // Also persist to Firebase if available
-            if (appData && appData.settings !== undefined) {
+            // Only persist to Firebase after data has fully loaded
+            if (!isFirstLoad && appData) {
+                if (!appData.settings) appData.settings = {};
                 appData.settings.theme = theme;
-                saveData();
-            } else if (appData) {
-                appData.settings = { theme };
                 saveData();
             }
             popup.style.display = 'none';
