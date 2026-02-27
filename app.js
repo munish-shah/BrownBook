@@ -2435,7 +2435,7 @@ function renderProgress() {
             <div class="summary-label">Recurring Tasks</div>
         </div>
         <div class="summary-card">
-            <div class="summary-value streak-value">${calculateRecurringStreak()} <i data-lucide="flame" class="icon icon-orange" style="width:18px;height:18px;"></i></div>
+            <div class="summary-value streak-value">${calculateRecurringStreak()} <i data-lucide="flame" class="icon icon-orange" style="width:22px;height:22px;"></i></div>
             <div class="summary-label">Current Streak</div>
         </div>
     `;

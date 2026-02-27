@@ -386,14 +386,13 @@ body {
     font-weight: 700;
     color: #ff9500;
     background: rgba(255, 149, 0, 0.12);
-    padding: 2px 8px;
+    padding: 3px 8px;
     border-radius: 10px;
     letter-spacing: 0;
     text-transform: none;
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    margin-left: 4px;
 }
 
 .streak-value {
