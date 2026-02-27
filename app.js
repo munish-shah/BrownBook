@@ -151,13 +151,15 @@ async function init() {
             const data = doc.data();
             appData = { ...appData, ...data }; // Merge with defaults
 
-            // Show sync indicator
+            // Show sync indicator (if element exists)
             const syncStatus = document.getElementById('syncStatus');
-            syncStatus.style.display = 'block';
-            setTimeout(() => {
-                syncStatus.style.opacity = '1';
-                setTimeout(() => syncStatus.style.opacity = '0.5', 1000);
-            }, 100);
+            if (syncStatus) {
+                syncStatus.style.display = 'block';
+                setTimeout(() => {
+                    syncStatus.style.opacity = '1';
+                    setTimeout(() => syncStatus.style.opacity = '0.5', 1000);
+                }, 100);
+            }
 
             // Always show import button to allow data restoration/migration
             document.getElementById('importDataBtn').style.display = 'block';
@@ -361,8 +363,10 @@ async function saveData() {
         await setDoc(DATA_DOC_REF, appData);
         // Sync indicator flash
         const syncStatus = document.getElementById('syncStatus');
-        syncStatus.style.opacity = '1';
-        setTimeout(() => syncStatus.style.opacity = '0.5', 500);
+        if (syncStatus) {
+            syncStatus.style.opacity = '1';
+            setTimeout(() => syncStatus.style.opacity = '0.5', 500);
+        }
     } catch (e) {
         console.error("Error saving to cloud:", e);
         alert("Sync error! Check your connection.");
