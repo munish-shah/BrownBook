@@ -396,9 +396,7 @@ body {
 }
 
 .streak-badge .icon {
-    vertical-align: baseline;
-    position: relative;
-    top: -1px;
+    vertical-align: initial;
 }
 
 .streak-value {
