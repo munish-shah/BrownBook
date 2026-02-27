@@ -390,14 +390,10 @@ body {
     border-radius: 10px;
     letter-spacing: 0;
     text-transform: none;
-    display: inline-flex;
+    display: flex;
     align-items: center;
+    justify-content: center;
     gap: 4px;
-    line-height: 1;
-}
-
-.streak-badge .icon {
-    flex-shrink: 0;
 }
 
 .streak-value {
