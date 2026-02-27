@@ -22,12 +22,12 @@ const DIFFICULTIES = {
 };
 
 const CATEGORIES = {
-    food: '🍕',
-    entertainment: '🎮',
-    purchase: '🛍️',
-    experience: '✨',
-    selfcare: '💆',
-    other: '🎁'
+    food: '<i data-lucide="utensils" class="icon icon-coral"></i>',
+    entertainment: '<i data-lucide="gamepad-2" class="icon icon-purple"></i>',
+    purchase: '<i data-lucide="shopping-bag" class="icon icon-blue"></i>',
+    experience: '<i data-lucide="sparkles" class="icon icon-amber"></i>',
+    selfcare: '<i data-lucide="heart-pulse" class="icon icon-pink"></i>',
+    other: '<i data-lucide="gift" class="icon icon-gray"></i>'
 };
 
 // Preset shop items with scaling prices
@@ -73,6 +73,9 @@ let isFirstLoad = true;
 
 // Initialize app with Firebase
 async function init() {
+    // Initialize Lucide icons for static HTML elements
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
     setupEventListeners();
     setupKeyManagement(); // Setup the new key UI
 
@@ -848,8 +851,9 @@ function setupKeyManagement() {
         input.select();
         document.execCommand('copy');
         const btn = document.getElementById('copyKeyBtn');
-        btn.textContent = '✅';
-        setTimeout(() => btn.textContent = '📋', 1000);
+        btn.innerHTML = '<i data-lucide="check" class="icon icon-green"></i>';
+        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [btn] });
+        setTimeout(() => { btn.innerHTML = '<i data-lucide="clipboard-copy" class="icon icon-gray"></i>'; if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [btn] }); }, 1000);
     });
 
     // Save/Load Key
@@ -1072,7 +1076,7 @@ function renderTasks() {
     const streak = calculateRecurringStreak();
     const streakBadge = document.getElementById('recurringStreakBadge');
     if (streakBadge) {
-        streakBadge.textContent = streak > 0 ? `🔥 ${streak}` : '';
+        streakBadge.innerHTML = streak > 0 ? `<i data-lucide="flame" class="icon icon-orange" style="width:12px;height:12px;"></i> ${streak}` : '';
         streakBadge.style.display = streak > 0 ? 'inline' : 'none';
     }
 
@@ -1192,6 +1196,9 @@ function renderTasks() {
             }
         });
     });
+
+    // Initialize Lucide icons for dynamically rendered content
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function createTaskRow(task, isCompleted, inFocusSection = false) {
@@ -1288,7 +1295,7 @@ function createTaskRow(task, isCompleted, inFocusSection = false) {
                     ${diff.emoji} ${diff.coins}
                 </div>
                 ${pinBtn}
-                ${!isCompleted ? `<button class="task-delete" data-id="${task.id}">🗑</button>` : ''}
+                ${!isCompleted ? `<button class="task-delete" data-id="${task.id}"><i data-lucide="trash-2" class="icon icon-red"></i></button>` : ''}
             </div>
             ${subtasksHtml}
         </div>
@@ -1385,7 +1392,7 @@ function createRecurringTaskRow(task, isCompleted, inFocusSection = false) {
             <div class="task-row recurring-row ${isCompleted ? 'completed' : ''} ${inFocusSection ? 'in-focus' : ''}" data-id="${task.id}" data-type="recurring" draggable="${!isCompleted}">
                 ${expandBtn}
                 <div class="task-checkbox recurring ${task.difficulty} ${isCompleted ? 'checked' : ''}" data-id="${task.id}">
-                    ${isCompleted ? '✓' : '🔄'}
+                    ${isCompleted ? '✓' : '<i data-lucide="repeat-2" class="icon icon-teal" style="width:14px;height:14px;"></i>'}
                 </div>
                 <div class="task-content">
                     <div class="task-title">${escapeHtml(task.title)}</div>
@@ -1396,7 +1403,7 @@ function createRecurringTaskRow(task, isCompleted, inFocusSection = false) {
                     ${diff.emoji} ${diff.coins}
                 </div>
                 ${pinBtn}
-                <button class="recurring-delete" data-id="${task.id}">🗑</button>
+                <button class="recurring-delete" data-id="${task.id}"><i data-lucide="trash-2" class="icon icon-red"></i></button>
             </div>
             ${subtasksHtml}
         </div>
@@ -1695,7 +1702,7 @@ function showCoinPopup(taskId, coins) {
     row.style.position = 'relative';
     const popup = document.createElement('div');
     popup.className = 'coins-popup';
-    popup.textContent = `+${coins} ✨`;
+    popup.textContent = `+${coins}`;
     row.appendChild(popup);
 
     setTimeout(() => popup.remove(), 800);
@@ -1930,9 +1937,9 @@ function renderRewards() {
     // Sale banner HTML
     const saleBanner = saleActive ? `
         <div class="sale-banner">
-            <span class="sale-icon">🎉</span>
+            <span class="sale-icon"><i data-lucide="party-popper" class="icon icon-orange"></i></span>
             <span class="sale-text">Weekend Sale - 50% Off!</span>
-            <span class="sale-icon">🎉</span>
+            <span class="sale-icon"><i data-lucide="party-popper" class="icon icon-orange"></i></span>
         </div>
     ` : '';
 
@@ -1955,7 +1962,7 @@ function renderRewards() {
     if (appData.rewards.length > 0) {
         rewardsHTML = `
             <div class="custom-rewards-section">
-                <h3>🎁 My Rewards</h3>
+                <h3><i data-lucide="trophy" class="icon icon-gold" style="width:16px;height:16px;"></i> My Rewards</h3>
                 <div class="rewards-list">
                     ${appData.rewards.map(reward => createRewardCard(reward)).join('')}
                 </div>
@@ -1964,7 +1971,7 @@ function renderRewards() {
     } else {
         rewardsHTML = `
             <div class="custom-rewards-section">
-                <h3>🎁 My Rewards</h3>
+                <h3><i data-lucide="trophy" class="icon icon-gold" style="width:16px;height:16px;"></i> My Rewards</h3>
                 <div class="empty-state small">
                     <p>Add your own custom rewards!</p>
                 </div>
@@ -1992,6 +1999,9 @@ function renderRewards() {
     document.querySelectorAll('.reward-delete').forEach(btn => {
         btn.addEventListener('click', () => deleteReward(btn.dataset.id));
     });
+
+    // Initialize Lucide icons for dynamically rendered content
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function createShopItemCard(item, saleActive = false) {
@@ -2038,20 +2048,20 @@ function createShopItemCard(item, saleActive = false) {
             <button class="shop-claim-btn ${canAfford ? 'can-claim' : 'cannot-claim'}" data-id="${item.id}" ${!canAfford ? 'disabled' : ''}>
                 ${canAfford ? 'Claim' : `Need ${currentPrice}`}
             </button>
-            <button class="shop-delete-btn" data-id="${item.id}">🗑</button>
+            <button class="shop-delete-btn" data-id="${item.id}"><i data-lucide="trash-2" class="icon icon-red"></i></button>
         </div>
     `;
 }
 
 function createRewardCard(reward) {
     const canAfford = appData.stats.currentBalance >= reward.cost;
-    const emoji = CATEGORIES[reward.category] || '🎁';
+    const emoji = CATEGORIES[reward.category] || '<i data-lucide="gift" class="icon icon-gray"></i>';
 
     return `
         <div class="reward-card ${canAfford ? '' : 'unaffordable'}" data-id="${reward.id}">
             <div class="reward-header">
                 <span class="reward-emoji">${emoji}</span>
-                <button class="reward-delete" data-id="${reward.id}">🗑</button>
+                <button class="reward-delete" data-id="${reward.id}"><i data-lucide="trash-2" class="icon icon-red"></i></button>
             </div>
             <div class="reward-name">${escapeHtml(reward.name)}</div>
             ${reward.description ? `<div class="reward-desc">${escapeHtml(reward.description)}</div>` : ''}
@@ -2160,7 +2170,7 @@ function saveNewReward() {
         const shopItem = {
             id: 'custom_' + Date.now().toString(),
             name,
-            emoji: CATEGORIES[category] || '🎁',
+            emoji: CATEGORIES[category] || '<i data-lucide="gift" class="icon icon-gray"></i>',
             baseCost,
             scaling,
             scalingType,
@@ -2362,7 +2372,7 @@ function renderProgress() {
     if (data.length === 0) {
         chartContainer.innerHTML = `
             <div class="chart-empty">
-                <span class="chart-empty-icon">📊</span>
+                <span class="chart-empty-icon"><i data-lucide="bar-chart-3" class="icon icon-gray" style="width:40px;height:40px;"></i></span>
                 <p>No data yet. Complete some recurring tasks!</p>
             </div>
         `;
@@ -2396,10 +2406,13 @@ function renderProgress() {
             <div class="summary-label">Recurring Tasks</div>
         </div>
         <div class="summary-card">
-            <div class="summary-value streak-value">${calculateRecurringStreak()} 🔥</div>
+            <div class="summary-value streak-value">${calculateRecurringStreak()} <i data-lucide="flame" class="icon icon-orange" style="width:18px;height:18px;"></i></div>
             <div class="summary-label">Current Streak</div>
         </div>
     `;
+
+    // Initialize Lucide icons for dynamically rendered content
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function renderBarChart(data) {

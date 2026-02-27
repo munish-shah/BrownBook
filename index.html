@@ -9,9 +9,10 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self' https://*.firebaseio.com https://*.googleapis.com https://*.firebasestorage.app https://cdn-icons-png.flaticon.com; script-src 'self' https://*.gstatic.com https://*.firebaseio.com https://*.googleapis.com 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://securetoken.googleapis.com;">
+        content="default-src 'self' https://*.firebaseio.com https://*.googleapis.com https://*.firebasestorage.app https://cdn-icons-png.flaticon.com https://unpkg.com; script-src 'self' https://*.gstatic.com https://*.firebaseio.com https://*.googleapis.com https://unpkg.com 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://securetoken.googleapis.com;">
     <title>BrownBook</title>
-    <link rel="stylesheet" href="styles.css?v=1.0.5">
+    <link rel="stylesheet" href="styles.css?v=1.1.0">
+    <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
 
@@ -45,33 +46,33 @@
 
             <div class="sync-status" id="syncStatus"
                 style="font-size: 10px; opacity: 0.5; margin-top: 4px; display: none;">
-                ☁️ Synced
+                <i data-lucide="cloud" class="icon icon-lightblue" style="width:12px;height:12px;"></i> Synced
             </div>
 
             <nav class="nav-tabs">
                 <button class="nav-tab active" data-tab="tasks">
-                    <span class="tab-icon">✓</span>
+                    <span class="tab-icon"><i data-lucide="circle-check-big" class="icon icon-green"></i></span>
                     <span class="tab-label">Tasks</span>
                 </button>
                 <button class="nav-tab" data-tab="rewards">
-                    <span class="tab-icon">🎁</span>
+                    <span class="tab-icon"><i data-lucide="gift" class="icon icon-pink"></i></span>
                     <span class="tab-label">Rewards</span>
                 </button>
                 <button class="nav-tab" data-tab="stats">
-                    <span class="tab-icon">📊</span>
+                    <span class="tab-icon"><i data-lucide="bar-chart-3" class="icon icon-blue"></i></span>
                     <span class="tab-label">Stats</span>
                 </button>
                 <button class="nav-tab" data-tab="progress">
-                    <span class="tab-icon">📈</span>
+                    <span class="tab-icon"><i data-lucide="chart-no-axes-combined" class="icon icon-orange"></i></span>
                     <span class="tab-label">Progress</span>
                 </button>
                 <button class="nav-tab" data-tab="history">
-                    <span class="tab-icon">📜</span>
+                    <span class="tab-icon"><i data-lucide="clock-3" class="icon icon-purple"></i></span>
                     <span class="tab-label">History</span>
                 </button>
                 <!-- Key Tab (Mobile Only) -->
                 <button class="nav-tab mobile-only" id="navKeyBtn">
-                    <span class="tab-icon">🔑</span>
+                    <span class="tab-icon"><i data-lucide="key-round" class="icon icon-gold"></i></span>
                     <span class="tab-label">Key</span>
                 </button>
             </nav>
@@ -80,12 +81,12 @@
                 <!-- Data Import Button (Hidden if data exists) -->
                 <button class="btn-import-data" id="importDataBtn" title="Import Data"
                     style="display: none; font-size: 16px; margin-top: 10px; background: none; border: none; padding: 4px; cursor: pointer; opacity: 0.6;">
-                    📥
+                    <i data-lucide="download" class="icon icon-gold"></i>
                 </button>
                 <!-- Sync/Key Button -->
                 <button class="btn-sync-key" id="manageKeyBtn" title="Link Device / Secret Key"
                     style="font-size: 16px; margin-top: 10px; background: none; border: none; padding: 4px; cursor: pointer; opacity: 0.6;">
-                    🔑
+                    <i data-lucide="key-round" class="icon icon-gold"></i>
                 </button>
             </div>
         </aside>
@@ -106,18 +107,19 @@
 
                 <div class="task-lists" id="taskLists">
                     <div class="empty-state" id="tasksEmpty">
-                        <span class="empty-icon">✓</span>
+                        <span class="empty-icon"><i data-lucide="circle-check-big" class="icon icon-green"></i></span>
                         <h3>No tasks yet</h3>
                         <p>Add a task to start earning coins!</p>
                     </div>
 
                     <section class="task-section" id="focusTasks" style="display: none;">
-                        <h2 class="section-title">🎯 FOCUS</h2>
+                        <h2 class="section-title"><i data-lucide="crosshair" class="icon icon-redorange"></i> FOCUS</h2>
                         <div class="task-list" id="focusTaskList"></div>
                     </section>
 
                     <section class="task-section" id="recurringTasks" style="display: none;">
-                        <h2 class="section-title">🔄 RECURRING <span id="recurringStreakBadge" class="streak-badge"></span></h2>
+                        <h2 class="section-title"><i data-lucide="repeat-2" class="icon icon-teal"></i> RECURRING <span
+                                id="recurringStreakBadge" class="streak-badge"></span></h2>
                         <div class="task-list" id="recurringTaskList"></div>
                     </section>
 
@@ -127,7 +129,8 @@
                     </section>
 
                     <section class="task-section" id="todayCompletedTasks" style="display: none;">
-                        <h2 class="section-title completed-header">✅ TODAY'S COMPLETED</h2>
+                        <h2 class="section-title completed-header"><i data-lucide="check-circle-2"
+                                class="icon icon-green"></i> TODAY'S COMPLETED</h2>
                         <div class="task-list" id="todayCompletedTaskList"></div>
                     </section>
                 </div>
@@ -162,17 +165,18 @@
                 <div class="stats-content">
                     <div class="stats-cards">
                         <div class="stat-card">
-                            <span class="stat-icon gold">💰</span>
+                            <span class="stat-icon gold"><i data-lucide="coins" class="icon icon-gold"></i></span>
                             <span class="stat-value" id="statTotalEarned">0</span>
                             <span class="stat-label">coins lifetime</span>
                         </div>
                         <div class="stat-card">
-                            <span class="stat-icon warm">💳</span>
+                            <span class="stat-icon warm"><i data-lucide="wallet" class="icon icon-orange"></i></span>
                             <span class="stat-value" id="statBalance">0</span>
                             <span class="stat-label">coins available</span>
                         </div>
                         <div class="stat-card">
-                            <span class="stat-icon green">✅</span>
+                            <span class="stat-icon green"><i data-lucide="check-circle-2"
+                                    class="icon icon-green"></i></span>
                             <span class="stat-value" id="statTasksDone">0</span>
                             <span class="stat-label">tasks completed</span>
                         </div>
@@ -184,7 +188,7 @@
                     </div>
 
                     <div class="rewards-claimed-card">
-                        <span class="claimed-icon">🎁</span>
+                        <span class="claimed-icon"><i data-lucide="trophy" class="icon icon-gold"></i></span>
                         <span class="claimed-number" id="statRewardsClaimed">0</span>
                         <span class="claimed-label">total rewards claimed</span>
                     </div>
@@ -235,13 +239,13 @@
                         <p class="subtitle">All your completed tasks</p>
                     </div>
                     <button class="btn btn-secondary" id="viewJsonBtn">
-                        📋 View JSON
+                        <i data-lucide="file-code" class="icon icon-gray"></i> View JSON
                     </button>
                 </header>
 
                 <div class="history-content" id="historyContent">
                     <div class="empty-state" id="historyEmpty">
-                        <span class="empty-icon">📜</span>
+                        <span class="empty-icon"><i data-lucide="clock-3" class="icon icon-purple"></i></span>
                         <h3>No completed tasks yet</h3>
                         <p>Complete some tasks and they'll appear here!</p>
                     </div>
@@ -341,7 +345,8 @@
                 <div class="form-group">
                     <label class="toggle-label">
                         <input type="checkbox" id="recurringTaskToggle">
-                        <span class="toggle-text">🔄 Recurring (resets at 6 AM)</span>
+                        <span class="toggle-text"><i data-lucide="repeat-2" class="icon icon-teal"
+                                style="width:14px;height:14px;"></i> Recurring (resets at 6 AM)</span>
                     </label>
                 </div>
 
@@ -424,12 +429,18 @@
                 <div class="form-group">
                     <label>Category</label>
                     <div class="category-picker" id="categoryPicker">
-                        <button class="cat-btn selected" data-category="food">🍕 Food</button>
-                        <button class="cat-btn" data-category="entertainment">🎮 Fun</button>
-                        <button class="cat-btn" data-category="purchase">🛍️ Buy</button>
-                        <button class="cat-btn" data-category="experience">✨ Exp</button>
-                        <button class="cat-btn" data-category="selfcare">💆 Self</button>
-                        <button class="cat-btn" data-category="other">🎁 Other</button>
+                        <button class="cat-btn selected" data-category="food"><i data-lucide="utensils"
+                                class="icon icon-coral"></i> Food</button>
+                        <button class="cat-btn" data-category="entertainment"><i data-lucide="gamepad-2"
+                                class="icon icon-purple"></i> Fun</button>
+                        <button class="cat-btn" data-category="purchase"><i data-lucide="shopping-bag"
+                                class="icon icon-blue"></i> Buy</button>
+                        <button class="cat-btn" data-category="experience"><i data-lucide="sparkles"
+                                class="icon icon-amber"></i> Exp</button>
+                        <button class="cat-btn" data-category="selfcare"><i data-lucide="heart-pulse"
+                                class="icon icon-pink"></i> Self</button>
+                        <button class="cat-btn" data-category="other"><i data-lucide="gift" class="icon icon-gray"></i>
+                            Other</button>
                     </div>
                 </div>
                 <div class="form-group">
@@ -493,7 +504,8 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="cancelClaim">Cancel</button>
-                <button class="btn btn-success" id="confirmClaim">Claim! 🎉</button>
+                <button class="btn btn-success" id="confirmClaim">Claim! <i data-lucide="sparkles"
+                        class="icon icon-gold" style="width:14px;height:14px;"></i></button>
             </div>
         </div>
     </div>
@@ -502,7 +514,8 @@
     <div class="modal" id="keyModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Link Device 🔑</h2>
+                <h2>Link Device <i data-lucide="key-round" class="icon icon-gold" style="width:18px;height:18px;"></i>
+                </h2>
                 <button class="modal-close" id="closeKeyModal">&times;</button>
             </div>
             <div class="modal-body">
@@ -510,7 +523,8 @@
                 <div style="display: flex; gap: 8px; margin-bottom: 20px;">
                     <input type="text" id="secretKeyInput"
                         style="flex: 1; padding: 10px; font-family: monospace; font-size: 16px; border: 1px solid #444; background: #222; color: #eecfa1; border-radius: 6px;">
-                    <button id="copyKeyBtn" class="btn btn-secondary" style="padding: 0 12px;">📋</button>
+                    <button id="copyKeyBtn" class="btn btn-secondary" style="padding: 0 12px;"><i
+                            data-lucide="clipboard-copy" class="icon icon-gray"></i></button>
                 </div>
 
                 <p style="font-size: 13px; color: #888; line-height: 1.5;">
@@ -527,7 +541,7 @@
         </div>
     </div>
 
-    <script type="module" src="app.js?v=1.0.5"></script>
+    <script type="module" src="app.js?v=1.1.0"></script>
 </body>
 
 </html>

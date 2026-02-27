@@ -1,5 +1,66 @@
 /* BrownBook - Styles */
 
+/* ============= Lucide Icon Utilities ============= */
+.icon {
+    width: 16px;
+    height: 16px;
+    display: inline-block;
+    vertical-align: middle;
+    stroke-width: 2;
+}
+
+.icon-green {
+    color: #4CAF50;
+}
+
+.icon-pink {
+    color: #E91E63;
+}
+
+.icon-blue {
+    color: #2196F3;
+}
+
+.icon-orange {
+    color: #FF9800;
+}
+
+.icon-purple {
+    color: #9C27B0;
+}
+
+.icon-gold {
+    color: #FFB300;
+}
+
+.icon-red {
+    color: #ef5350;
+}
+
+.icon-redorange {
+    color: #FF5722;
+}
+
+.icon-teal {
+    color: #00BCD4;
+}
+
+.icon-gray {
+    color: #78909C;
+}
+
+.icon-lightblue {
+    color: #64B5F6;
+}
+
+.icon-coral {
+    color: #FF7043;
+}
+
+.icon-amber {
+    color: #FFCA28;
+}
+
 :root {
     /* Color palette - Warm, inviting */
     --bg-primary: #FDF6E3;
