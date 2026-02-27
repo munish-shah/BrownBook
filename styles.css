@@ -390,12 +390,18 @@ body {
     border-radius: 10px;
     letter-spacing: 0;
     text-transform: none;
-    vertical-align: middle;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     margin-left: 4px;
 }
 
 .streak-value {
     color: #ff9500 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
 }
 
 .task-list {
