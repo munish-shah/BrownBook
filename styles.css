@@ -397,7 +397,7 @@ body {
 }
 
 .streak-badge .icon {
-    display: block;
+    flex-shrink: 0;
 }
 
 .streak-value {
