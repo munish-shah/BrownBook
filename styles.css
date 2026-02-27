@@ -195,7 +195,8 @@ body {
 }
 
 .logo-icon {
-    font-size: 28px;
+    display: flex;
+    align-items: center;
 }
 
 .app-name {
