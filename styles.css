@@ -404,6 +404,12 @@ body {
     gap: 4px;
 }
 
+.streak-badge .icon,
+.streak-value .icon {
+    position: relative;
+    top: -2px;
+}
+
 .task-list {
     display: flex;
     flex-direction: column;
