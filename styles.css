@@ -237,6 +237,10 @@ body {
     -webkit-app-region: no-drag;
 }
 
+.mobile-only {
+    display: none !important;
+}
+
 .nav-tab {
     display: flex;
     align-items: center;
