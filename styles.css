@@ -736,7 +736,7 @@ body {
 
 /* Stats View */
 .stats-content {
-    max-width: 600px;
+    width: 100%;
 }
 
 .stats-cards {
@@ -754,8 +754,8 @@ body {
 }
 
 .stat-icon {
-    font-size: 22px;
-    display: block;
+    display: flex;
+    align-items: center;
     margin-bottom: 8px;
 }
 
