@@ -274,6 +274,46 @@
     --input-bg: #161630;
 }
 
+/* ===== Theme: Ember ===== */
+[data-theme="ember"] {
+    --bg-primary: #1A1210;
+    --bg-secondary: #251A16;
+    --bg-sidebar: #251A16;
+    --card-bg: #352420;
+    --accent-warm: #FF6B35;
+    --accent-warm-dark: #E05020;
+    --accent-gold: #FF6B35;
+    --accent-gold-dark: #E05020;
+    --coin-center: #1A1210;
+    --success-green: #66BB6A;
+    --success-green-dark: #4CAF50;
+    --text-primary: #F0E0D8;
+    --text-secondary: #B09080;
+    --text-muted: #706058;
+    --border-color: #402E26;
+    --input-bg: #2A1E1A;
+}
+
+/* ===== Theme: Slate ===== */
+[data-theme="slate"] {
+    --bg-primary: #15191E;
+    --bg-secondary: #1C2128;
+    --bg-sidebar: #1C2128;
+    --card-bg: #262C35;
+    --accent-warm: #8B9FBC;
+    --accent-warm-dark: #6B83A0;
+    --accent-gold: #8B9FBC;
+    --accent-gold-dark: #6B83A0;
+    --coin-center: #15191E;
+    --success-green: #56D364;
+    --success-green-dark: #3FB950;
+    --text-primary: #E0E4EA;
+    --text-secondary: #8B95A5;
+    --text-muted: #5A6472;
+    --border-color: #30363D;
+    --input-bg: #1E242C;
+}
+
 * {
     margin: 0;
     padding: 0;
