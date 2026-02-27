@@ -876,7 +876,8 @@ body {
 }
 
 .claimed-icon {
-    font-size: 28px;
+    display: flex;
+    align-items: center;
 }
 
 .claimed-number {
@@ -1241,6 +1242,9 @@ input[type="range"]::-webkit-slider-thumb {
     font-size: 18px;
     font-weight: 600;
     color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .reset-timer {
@@ -1358,6 +1362,9 @@ input[type="range"]::-webkit-slider-thumb {
     font-weight: 600;
     color: var(--text-primary);
     margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .rewards-list {
