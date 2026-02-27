@@ -14,11 +14,11 @@ DATA_DOC_REF = doc(db, "users", SECRET_KEY);
 
 // Difficulty configurations
 const DIFFICULTIES = {
-    quick: { emoji: '🟢', name: 'Quick', coins: 5, time: '< 5 min' },
-    easy: { emoji: '🔵', name: 'Easy', coins: 15, time: '5-15 min' },
-    medium: { emoji: '🟡', name: 'Medium', coins: 25, time: '15-45 min' },
-    hard: { emoji: '🟠', name: 'Hard', coins: 50, time: '45-90 min' },
-    epic: { emoji: '🔴', name: 'Epic', coins: 75, time: '2+ hours' }
+    quick: { emoji: '<span class="diff-dot diff-quick"></span>', name: 'Quick', coins: 5, time: '< 5 min' },
+    easy: { emoji: '<span class="diff-dot diff-easy"></span>', name: 'Easy', coins: 15, time: '5-15 min' },
+    medium: { emoji: '<span class="diff-dot diff-medium"></span>', name: 'Medium', coins: 25, time: '15-45 min' },
+    hard: { emoji: '<span class="diff-dot diff-hard"></span>', name: 'Hard', coins: 50, time: '45-90 min' },
+    epic: { emoji: '<span class="diff-dot diff-epic"></span>', name: 'Epic', coins: 75, time: '2+ hours' }
 };
 
 const CATEGORIES = {
@@ -176,6 +176,35 @@ async function runMigrationsAndCleanup() {
 
     // Clear stale recurring completions
     const today = getTodayDateString();
+
+    // One-time migration: Update existing shop item emojis to Lucide icons
+    if (!appData.stats.emoji_to_lucide_migration) {
+        const emojiToLucide = {
+            '🍕': '<i data-lucide="utensils" class="icon icon-coral"></i>',
+            '🎮': '<i data-lucide="gamepad-2" class="icon icon-purple"></i>',
+            '🛍️': '<i data-lucide="shopping-bag" class="icon icon-blue"></i>',
+            '✨': '<i data-lucide="sparkles" class="icon icon-amber"></i>',
+            '💆': '<i data-lucide="heart-pulse" class="icon icon-pink"></i>',
+            '🎁': '<i data-lucide="gift" class="icon icon-gray"></i>',
+            '📺': '<i data-lucide="tv" class="icon icon-blue"></i>',
+            '🎬': '<i data-lucide="clapperboard" class="icon icon-purple"></i>',
+        };
+        let migrated = false;
+        (appData.customShopItems || []).forEach(item => {
+            if (item.emoji && emojiToLucide[item.emoji]) {
+                item.emoji = emojiToLucide[item.emoji];
+                migrated = true;
+            }
+        });
+        (appData.rewards || []).forEach(reward => {
+            if (reward.emoji && emojiToLucide[reward.emoji]) {
+                reward.emoji = emojiToLucide[reward.emoji];
+                migrated = true;
+            }
+        });
+        appData.stats.emoji_to_lucide_migration = true;
+        needsSave = true;
+    }
 
 
 
@@ -1204,7 +1233,7 @@ function renderTasks() {
 function createTaskRow(task, isCompleted, inFocusSection = false) {
     const diff = DIFFICULTIES[task.difficulty];
     const isPinned = appData.focusPinnedIds && appData.focusPinnedIds.includes(task.id);
-    const pinIcon = isPinned ? '📍' : '📌';
+    const pinIcon = `<i data-lucide="${isPinned ? 'pin-off' : 'pin'}" class="icon ${isPinned ? 'icon-orange' : 'icon-gray'}" style="width:14px;height:14px;"></i>`;
 
     // Calculate expiration timer if applicable
     let expiryHtml = '';
@@ -1313,15 +1342,15 @@ function getTimeRemaining(expiresAt) {
 
     if (hours >= 24) {
         const days = Math.floor(hours / 24);
-        return { display: `⏰ ${days}d ${hours % 24}h`, totalMs: diff };
+        return { display: `⏱ ${days}d ${hours % 24}h`, totalMs: diff };
     }
-    return { display: `⏰ ${hours}h ${minutes}m`, totalMs: diff };
+    return { display: `⏱ ${hours}h ${minutes}m`, totalMs: diff };
 }
 
 function createRecurringTaskRow(task, isCompleted, inFocusSection = false) {
     const diff = DIFFICULTIES[task.difficulty];
     const isPinned = appData.focusPinnedIds && appData.focusPinnedIds.includes(task.id);
-    const pinIcon = isPinned ? '📍' : '📌';
+    const pinIcon = `<i data-lucide="${isPinned ? 'pin-off' : 'pin'}" class="icon ${isPinned ? 'icon-orange' : 'icon-gray'}" style="width:14px;height:14px;"></i>`;
 
     // Pin button (only show for active recurring tasks, not completed)
     const pinBtn = !isCompleted ? `<button class="task-pin ${isPinned ? 'pinned' : ''}" data-id="${task.id}" data-type="recurring">${pinIcon}</button>` : '';
@@ -1948,7 +1977,7 @@ function renderRewards() {
         <div class="shop-section">
             ${saleBanner}
             <div class="shop-header">
-                <h3>📺 Daily Shop</h3>
+                <h3><i data-lucide="store" class="icon icon-amber" style="width:16px;height:16px;"></i> Daily Shop</h3>
                 <span class="reset-timer">Resets in ${getTimeUntilReset()}</span>
             </div>
             <div class="shop-items">

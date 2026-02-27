@@ -61,6 +61,35 @@
     color: #FFCA28;
 }
 
+/* Difficulty dot indicators */
+.diff-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    vertical-align: middle;
+}
+
+.diff-dot.diff-quick {
+    background: #4CAF50;
+}
+
+.diff-dot.diff-easy {
+    background: #2196F3;
+}
+
+.diff-dot.diff-medium {
+    background: #FFC107;
+}
+
+.diff-dot.diff-hard {
+    background: #FF9800;
+}
+
+.diff-dot.diff-epic {
+    background: #F44336;
+}
+
 :root {
     /* Color palette - Warm, inviting */
     --bg-primary: #FDF6E3;
