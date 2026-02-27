@@ -395,6 +395,12 @@ body {
     gap: 4px;
 }
 
+.streak-badge .icon {
+    vertical-align: baseline;
+    position: relative;
+    top: -1px;
+}
+
 .streak-value {
     color: #ff9500 !important;
     display: flex;
