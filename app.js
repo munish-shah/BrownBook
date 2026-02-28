@@ -171,6 +171,7 @@ async function init() {
             if (isFirstLoad) {
                 runMigrationsAndCleanup();
                 runBackfillJan31(); // One-time fix for missing Jan 31st tasks
+                runBackfillFeb27(); // Backfill "Job Applications" for yesterday
                 isFirstLoad = false;
             }
 
@@ -2682,6 +2683,58 @@ function calculateRecurringStreak() {
     }
 
     return streak;
+}
+
+// Backfill for Feb 27: Add missing "Job Applications" completion to preserve streak/progress
+function runBackfillFeb27() {
+    if (!appData || !appData.stats) return;
+
+    if (!appData.stats.backfill_feb27_done) {
+        // Find the "Job Applications" task
+        const jobTask = appData.recurringTasks.find(t =>
+            t.title.toLowerCase().includes('job') &&
+            t.title.toLowerCase().includes('application')
+        );
+
+        if (jobTask) {
+            // Check if there's already a completion for Feb 27
+            const hasFeb27Completion = appData.completedHistory.some(h => {
+                if (h.recurringId !== jobTask.id || !h.completedAt) return false;
+
+                // Convert UTC completedAt to local date string matching "2026-02-27"
+                const date = new Date(h.completedAt);
+                if (date.getHours() < 6) date.setDate(date.getDate() - 1); // Respect 6AM reset
+
+                const yyyy = date.getFullYear();
+                const mm = String(date.getMonth() + 1).padStart(2, '0');
+                const dd = String(date.getDate()).padStart(2, '0');
+                const localDateStr = `${yyyy}-${mm}-${dd}`;
+
+                return localDateStr === '2026-02-27';
+            });
+
+            if (!hasFeb27Completion) {
+                // Add a fake completion for Feb 27 at noon UTC
+                appData.completedHistory.unshift({
+                    ...jobTask,
+                    completedAt: '2026-02-27T12:00:00.000Z',
+                    originalTaskId: jobTask.id + '-backfill-feb27',
+                    isRecurring: true,
+                    recurringId: jobTask.id
+                });
+
+                // Add coins for the backfilled task
+                const diffCoins = DIFFICULTIES[jobTask.difficulty]?.coins || 10;
+                appData.stats.totalCoinsEarned += diffCoins;
+                appData.stats.currentBalance += diffCoins;
+
+                console.log("Backfilled 'Job Applications' for Feb 27");
+            }
+        }
+
+        appData.stats.backfill_feb27_done = true;
+        saveData();
+    }
 }
 
 function calculateRecurringConsistency(range) {
