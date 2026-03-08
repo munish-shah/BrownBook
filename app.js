@@ -1782,10 +1782,11 @@ function toggleRecurringTask(id) {
     updateCoinDisplay();
 }
 
-function deleteRecurringTask(id) {
+async function deleteRecurringTask(id) {
     const task = appData.recurringTasks.find(t => t.id === id);
     const taskName = task ? task.title : 'this task';
-    if (!confirm(`Delete recurring task "${taskName}"? This cannot be undone.`)) return;
+    const confirmed = await showDeleteConfirmation(`Are you sure you want to delete "${taskName}"? This cannot be undone.`);
+    if (!confirmed) return;
 
     // Soft delete: mark as deleted instead of removing, so history is preserved in progress
     if (task) {
@@ -1908,10 +1909,11 @@ function viewJsonData() {
     });
 }
 
-function deleteTask(id) {
+async function deleteTask(id) {
     const task = appData.tasks.find(t => t.id === id);
     const taskName = task ? task.title : 'this task';
-    if (!confirm(`Delete task "${taskName}"? This cannot be undone.`)) return;
+    const confirmed = await showDeleteConfirmation(`Are you sure you want to delete "${taskName}"? This cannot be undone.`);
+    if (!confirmed) return;
 
     appData.tasks = appData.tasks.filter(t => t.id !== id);
     saveData();
@@ -2692,23 +2694,56 @@ function calculateRecurringStreak() {
     return streak;
 }
 
-// One-time fix: Undelete accidentally deleted Gym task
+// One-time fix: Undelete accidentally deleted Gym task (v2 - broader match)
 function runUndeleteGym() {
     if (!appData || !appData.stats) return;
-    if (appData.stats.undelete_gym_done) return;
+    if (appData.stats.undelete_gym_v2_done) return;
 
-    const gymTask = appData.recurringTasks.find(t =>
-        t.deleted && t.title && t.title.toLowerCase().includes('gym')
+    // Find any deleted recurring task that has interval scheduling (activeDays/breakDays)
+    const deletedIntervalTasks = appData.recurringTasks.filter(t =>
+        t.deleted && t.type === 'interval'
     );
 
-    if (gymTask) {
-        delete gymTask.deleted;
-        delete gymTask.deletedAt;
-        console.log("Restored accidentally deleted Gym task:", gymTask.title);
-    }
+    deletedIntervalTasks.forEach(task => {
+        delete task.deleted;
+        delete task.deletedAt;
+        console.log("Restored accidentally deleted interval task:", task.title);
+    });
 
-    appData.stats.undelete_gym_done = true;
+    appData.stats.undelete_gym_v2_done = true;
     saveData();
+}
+
+// Show custom delete confirmation modal (returns a Promise)
+function showDeleteConfirmation(message) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('deleteModal');
+        const messageEl = document.getElementById('deleteMessage');
+        const confirmBtn = document.getElementById('confirmDelete');
+        const cancelBtn = document.getElementById('cancelDelete');
+        const closeBtn = document.getElementById('closeDeleteModal');
+
+        messageEl.textContent = message;
+        modal.classList.add('open');
+
+        // Re-render Lucide icons in modal
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        function cleanup(result) {
+            modal.classList.remove('open');
+            confirmBtn.removeEventListener('click', onConfirm);
+            cancelBtn.removeEventListener('click', onCancel);
+            closeBtn.removeEventListener('click', onCancel);
+            resolve(result);
+        }
+
+        function onConfirm() { cleanup(true); }
+        function onCancel() { cleanup(false); }
+
+        confirmBtn.addEventListener('click', onConfirm);
+        cancelBtn.addEventListener('click', onCancel);
+        closeBtn.addEventListener('click', onCancel);
+    });
 }
 
 function calculateRecurringConsistency(range) {

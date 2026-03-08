@@ -594,6 +594,11 @@ body {
     color: white;
 }
 
+.btn-danger {
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+    color: white;
+}
+
 /* Task Section */
 .task-section {
     margin-bottom: 28px;
