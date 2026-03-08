@@ -173,6 +173,11 @@ async function init() {
                 runBackfillJan31(); // One-time fix for missing Jan 31st tasks
                 runUndeleteGym(); // One-time fix for accidentally deleted gym task
                 isFirstLoad = false;
+
+                // TEMP DEBUG: Log all recurring tasks to console
+                console.log("=== DEBUG: All Recurring Tasks ===");
+                console.log(JSON.stringify(appData.recurringTasks.map(t => ({ id: t.id, title: t.title, type: t.type, deleted: t.deleted, deletedAt: t.deletedAt, activeDays: t.activeDays, breakDays: t.breakDays })), null, 2));
+                console.log("=== END DEBUG ===");
             }
 
             renderAll();
