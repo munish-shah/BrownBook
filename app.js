@@ -2741,7 +2741,7 @@ function calculateRecurringConsistency(range) {
 
     if (range === 'daily') {
         // Last 7 days (or since first use, whichever is shorter)
-        const daysSinceFirstUse = Math.floor((now - firstUse) / (1000 * 60 * 60 * 24));
+        const daysSinceFirstUse = daysBetweenDates(firstUse, now);
         const daysToShow = Math.min(7, daysSinceFirstUse + 1);
 
         for (let i = daysToShow - 1; i >= 0; i--) {
