@@ -171,13 +171,7 @@ async function init() {
             if (isFirstLoad) {
                 runMigrationsAndCleanup();
                 runBackfillJan31(); // One-time fix for missing Jan 31st tasks
-                runUndeleteGym(); // One-time fix for accidentally deleted gym task
                 isFirstLoad = false;
-
-                // TEMP DEBUG: Log all recurring tasks to console
-                console.log("=== DEBUG: All Recurring Tasks ===");
-                console.log(JSON.stringify(appData.recurringTasks.map(t => ({ id: t.id, title: t.title, type: t.type, deleted: t.deleted, deletedAt: t.deletedAt, activeDays: t.activeDays, breakDays: t.breakDays })), null, 2));
-                console.log("=== END DEBUG ===");
             }
 
             renderAll();
@@ -1035,6 +1029,13 @@ function isRecurringCompletedToday(taskId) {
     return appData.recurringCompletions[taskId] === today;
 }
 
+// DST-safe day difference: uses UTC to avoid 23/25-hour day issues
+function daysBetweenDates(startDate, endDate) {
+    const utcStart = Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const utcEnd = Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    return Math.floor((utcEnd - utcStart) / (24 * 60 * 60 * 1000));
+}
+
 // Check if an interval task should show today based on its cycle
 function shouldShowIntervalTask(task) {
     // If not an interval task (daily or undefined type), always show
@@ -1051,14 +1052,11 @@ function shouldShowIntervalTask(task) {
     if (now.getHours() < 6) {
         now.setDate(now.getDate() - 1);
     }
-    now.setHours(6, 0, 0, 0);
 
     const startDate = new Date(task.cycleStartDate);
-    startDate.setHours(6, 0, 0, 0);
 
-    // Calculate days since cycle start
-    const msPerDay = 24 * 60 * 60 * 1000;
-    const daysSinceStart = Math.floor((now - startDate) / msPerDay);
+    // DST-safe day calculation using UTC
+    const daysSinceStart = daysBetweenDates(startDate, now);
 
     // Total cycle length
     const totalCycle = task.activeDays + task.breakDays;
@@ -2627,10 +2625,9 @@ function isTaskActiveOnDate(task, date) {
     // Interval tasks: check if date falls on active or break day
     if (task.type === 'interval' && task.cycleStartDate) {
         const cycleStart = new Date(task.cycleStartDate);
-        cycleStart.setHours(0, 0, 0, 0);
 
-        // Calculate days since cycle start
-        const daysDiff = Math.floor((checkDate - cycleStart) / (1000 * 60 * 60 * 24));
+        // DST-safe day calculation using UTC
+        const daysDiff = daysBetweenDates(cycleStart, checkDate);
         if (daysDiff < 0) return false; // Before cycle started
 
         const cycleLength = task.activeDays + task.breakDays;
@@ -2697,26 +2694,6 @@ function calculateRecurringStreak() {
     }
 
     return streak;
-}
-
-// One-time fix: Undelete accidentally deleted Gym task (v2 - broader match)
-function runUndeleteGym() {
-    if (!appData || !appData.stats) return;
-    if (appData.stats.undelete_gym_v2_done) return;
-
-    // Find any deleted recurring task that has interval scheduling (activeDays/breakDays)
-    const deletedIntervalTasks = appData.recurringTasks.filter(t =>
-        t.deleted && t.type === 'interval'
-    );
-
-    deletedIntervalTasks.forEach(task => {
-        delete task.deleted;
-        delete task.deletedAt;
-        console.log("Restored accidentally deleted interval task:", task.title);
-    });
-
-    appData.stats.undelete_gym_v2_done = true;
-    saveData();
 }
 
 // Show custom delete confirmation modal (returns a Promise)
