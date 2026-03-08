@@ -171,6 +171,7 @@ async function init() {
             if (isFirstLoad) {
                 runMigrationsAndCleanup();
                 runBackfillJan31(); // One-time fix for missing Jan 31st tasks
+                runUndeleteGym(); // One-time fix for accidentally deleted gym task
                 isFirstLoad = false;
             }
 
@@ -1782,8 +1783,11 @@ function toggleRecurringTask(id) {
 }
 
 function deleteRecurringTask(id) {
-    // Soft delete: mark as deleted instead of removing, so history is preserved in progress
     const task = appData.recurringTasks.find(t => t.id === id);
+    const taskName = task ? task.title : 'this task';
+    if (!confirm(`Delete recurring task "${taskName}"? This cannot be undone.`)) return;
+
+    // Soft delete: mark as deleted instead of removing, so history is preserved in progress
     if (task) {
         task.deleted = true;
         task.deletedAt = new Date().toISOString();
@@ -1905,6 +1909,10 @@ function viewJsonData() {
 }
 
 function deleteTask(id) {
+    const task = appData.tasks.find(t => t.id === id);
+    const taskName = task ? task.title : 'this task';
+    if (!confirm(`Delete task "${taskName}"? This cannot be undone.`)) return;
+
     appData.tasks = appData.tasks.filter(t => t.id !== id);
     saveData();
     renderTasks();
@@ -2682,6 +2690,25 @@ function calculateRecurringStreak() {
     }
 
     return streak;
+}
+
+// One-time fix: Undelete accidentally deleted Gym task
+function runUndeleteGym() {
+    if (!appData || !appData.stats) return;
+    if (appData.stats.undelete_gym_done) return;
+
+    const gymTask = appData.recurringTasks.find(t =>
+        t.deleted && t.title && t.title.toLowerCase().includes('gym')
+    );
+
+    if (gymTask) {
+        delete gymTask.deleted;
+        delete gymTask.deletedAt;
+        console.log("Restored accidentally deleted Gym task:", gymTask.title);
+    }
+
+    appData.stats.undelete_gym_done = true;
+    saveData();
 }
 
 function calculateRecurringConsistency(range) {
