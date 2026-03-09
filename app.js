@@ -1957,6 +1957,11 @@ function isWeekendSale() {
     // Check for holiday dates (6AM to 6AM next day)
     const holidays = [
         '2026-01-19', // MLK Day
+        '2026-03-09', // Spring Break
+        '2026-03-10', // Spring Break
+        '2026-03-11', // Spring Break
+        '2026-03-12', // Spring Break
+        '2026-03-13', // Spring Break
     ];
 
     const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
