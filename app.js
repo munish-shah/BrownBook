@@ -71,6 +71,32 @@ let currentRewardToClaim = null;
 let currentShopItemToClaim = null;
 let isFirstLoad = true;
 
+// ========== Reset Time Configuration ==========
+// To change the reset time: add a new entry with the date it takes effect.
+// Historical completions will always use the reset hour that was active at the time.
+const DEFAULT_RESET_HOUR = 6; // Original reset hour before any transitions
+const RESET_TRANSITIONS = [
+    { date: '2026-03-12', hour: 2 }, // Moved from 6AM to 2AM
+];
+
+// Get the current reset hour (for "what day is it NOW?" checks)
+function getCurrentResetHour() {
+    const last = RESET_TRANSITIONS[RESET_TRANSITIONS.length - 1];
+    return last ? last.hour : DEFAULT_RESET_HOUR;
+}
+
+// Get the reset hour that was active when a historical timestamp was recorded
+function getResetHourForTimestamp(date) {
+    // Walk transitions in reverse to find which was active at this date
+    for (let i = RESET_TRANSITIONS.length - 1; i >= 0; i--) {
+        const t = RESET_TRANSITIONS[i];
+        if (date >= new Date(t.date + 'T00:00:00')) {
+            return t.hour;
+        }
+    }
+    return DEFAULT_RESET_HOUR;
+}
+
 // Initialize app with Firebase
 // ========== Theme Switcher ==========
 const THEME_COLORS = {
@@ -295,7 +321,7 @@ async function runMigrationsAndCleanup() {
 
             // Check if this recurring task matches TODAY
             const date = new Date(h.completedAt);
-            if (date.getHours() < 6) date.setDate(date.getDate() - 1);
+            if (date.getHours() < getResetHourForTimestamp(date)) date.setDate(date.getDate() - 1);
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
             const day = String(date.getDate()).padStart(2, '0');
@@ -326,7 +352,7 @@ async function runMigrationsAndCleanup() {
                 if (h.recurringId !== taskId || !h.completedAt) return false;
 
                 const date = new Date(h.completedAt);
-                if (date.getHours() < 6) date.setDate(date.getDate() - 1);
+                if (date.getHours() < getResetHourForTimestamp(date)) date.setDate(date.getDate() - 1);
                 const year = date.getFullYear();
                 const month = String(date.getMonth() + 1).padStart(2, '0');
                 const day = String(date.getDate()).padStart(2, '0');
@@ -452,7 +478,7 @@ async function toggleSubtask(event, parentId, subtaskId, type) {
             const historyIndex = appData.completedHistory.findIndex(h => {
                 if (!h.completedAt || h.recurringId !== parentId) return false;
                 const d = new Date(h.completedAt);
-                if (d.getHours() < 6) d.setDate(d.getDate() - 1);
+                if (d.getHours() < getResetHourForTimestamp(d)) d.setDate(d.getDate() - 1);
                 return getDateString(d) === getTodayDateString();
             });
             if (historyIndex > -1) {
@@ -1008,11 +1034,11 @@ function updateCoinDisplay() {
 
 // ============= TASKS =============
 
-// Get today's date for reset (uses 6AM reset logic from shop)
+// Get today's date for reset (uses configurable reset hour)
 function getTodayDateString() {
     const now = new Date();
-    // If before 6AM, count as previous day
-    if (now.getHours() < 6) {
+    // If before reset hour, count as previous day
+    if (now.getHours() < getCurrentResetHour()) {
         now.setDate(now.getDate() - 1);
     }
 
@@ -1049,7 +1075,7 @@ function shouldShowIntervalTask(task) {
 
     const now = new Date();
     // Adjust for 6AM reset
-    if (now.getHours() < 6) {
+    if (now.getHours() < getCurrentResetHour()) {
         now.setDate(now.getDate() - 1);
     }
 
@@ -1084,7 +1110,7 @@ function renderTasks() {
         if (t.isRecurring) return false; // Skip recurring entries, they're shown from recurringCompleted
         const completedDate = new Date(t.completedAt);
         // Check if completed after 6AM today
-        const todayStart = new Date(today + 'T06:00:00');
+        const todayStart = new Date(today + 'T' + String(getCurrentResetHour()).padStart(2, '0') + ':00:00');
         return completedDate >= todayStart;
     });
 
@@ -1621,7 +1647,7 @@ function saveNewTask() {
             const startDate = new Date();
             startDate.setDate(startDate.getDate() - daysAgo);
             // Set to 6AM to match reset time
-            startDate.setHours(6, 0, 0, 0);
+            startDate.setHours(getCurrentResetHour(), 0, 0, 0);
             recurringTask.cycleStartDate = startDate.toISOString();
         }
 
@@ -1648,12 +1674,12 @@ function saveNewTask() {
                 task.expiresAt = new Date(customDT).toISOString();
             }
         } else if (expirationDays !== '') {
-            // Use preset (next 6AM + days)
+            // Use preset (next reset hour + days)
             const now = new Date();
             let next6AM = new Date(now);
-            next6AM.setHours(6, 0, 0, 0);
-            // If already past 6AM today, next 6AM is tomorrow
-            if (now.getHours() >= 6) {
+            next6AM.setHours(getCurrentResetHour(), 0, 0, 0);
+            // If already past reset hour today, next reset is tomorrow
+            if (now.getHours() >= getCurrentResetHour()) {
                 next6AM.setDate(next6AM.getDate() + 1);
             }
             // Add the offset days
@@ -1742,7 +1768,7 @@ function toggleRecurringTask(id) {
 
             // Convert history timestamp to "App Date" (Local + 6AM offset)
             const date = new Date(t.completedAt);
-            if (date.getHours() < 6) date.setDate(date.getDate() - 1);
+            if (date.getHours() < getResetHourForTimestamp(date)) date.setDate(date.getDate() - 1);
 
             const year = date.getFullYear();
             const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -1852,7 +1878,7 @@ function renderHistory() {
         if (task.completedAt) {
             const completedDate = new Date(task.completedAt);
             // If completed before 6AM, count as previous day
-            if (completedDate.getHours() < 6) {
+            if (completedDate.getHours() < getResetHourForTimestamp(completedDate)) {
                 completedDate.setDate(completedDate.getDate() - 1);
             }
             date = completedDate.toLocaleDateString('en-US', {
@@ -1930,7 +1956,7 @@ async function deleteTask(id) {
 // Get today's date string for shop reset (uses 6AM logic)
 function getResetDateString() {
     const now = new Date();
-    if (now.getHours() < 6) {
+    if (now.getHours() < getCurrentResetHour()) {
         now.setDate(now.getDate() - 1);
     }
 
@@ -1941,20 +1967,21 @@ function getResetDateString() {
     return `${year}-${month}-${day}`;
 }
 
-// Check if weekend sale is active (6AM Saturday to 6AM Monday) or on a holiday
+// Check if weekend sale is active (reset-hour Saturday to reset-hour Monday) or on a holiday
 function isWeekendSale() {
     const now = new Date();
     const day = now.getDay(); // 0=Sun, 6=Sat
     const hour = now.getHours();
+    const resetHour = getCurrentResetHour();
 
-    // Saturday 6AM onwards
-    if (day === 6 && hour >= 6) return true;
+    // Saturday after reset hour onwards
+    if (day === 6 && hour >= resetHour) return true;
     // All of Sunday
     if (day === 0) return true;
-    // Monday before 6AM
-    if (day === 1 && hour < 6) return true;
+    // Monday before reset hour
+    if (day === 1 && hour < resetHour) return true;
 
-    // Check for holiday dates (6AM to 6AM next day)
+    // Check for holiday dates (reset-hour to reset-hour next day)
     const holidays = [
         '2026-01-19', // MLK Day
         '2026-03-09', // Spring Break
@@ -1966,14 +1993,14 @@ function isWeekendSale() {
 
     const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-    // Check if today is a holiday (after 6AM)
-    if (holidays.includes(dateStr) && hour >= 6) return true;
+    // Check if today is a holiday (after reset hour)
+    if (holidays.includes(dateStr) && hour >= resetHour) return true;
 
-    // Check if yesterday was a holiday (before 6AM today)
+    // Check if yesterday was a holiday (before reset hour today)
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
-    if (holidays.includes(yesterdayStr) && hour < 6) return true;
+    if (holidays.includes(yesterdayStr) && hour < resetHour) return true;
 
     return false;
 }
@@ -2026,16 +2053,16 @@ function getShopItemPrice(item, isDailyShop = true) {
     }
 }
 
-// Get time until 6AM local time reset
+// Get time until reset
 function getTimeUntilReset() {
     const now = new Date();
 
-    // Calculate next 6AM
+    // Calculate next reset time
     let next6AM = new Date(now);
-    next6AM.setHours(6, 0, 0, 0);
+    next6AM.setHours(getCurrentResetHour(), 0, 0, 0);
 
-    // If it's already past 6AM today, next reset is tomorrow
-    if (now.getHours() >= 6) {
+    // If it's already past reset hour today, next reset is tomorrow
+    if (now.getHours() >= getCurrentResetHour()) {
         next6AM.setDate(next6AM.getDate() + 1);
     }
 
@@ -2656,7 +2683,7 @@ function calculateRecurringStreak() {
 
     // Check today first: are ALL active (non-deleted) recurring tasks completed?
     const todayDate = new Date();
-    if (todayDate.getHours() < 6) todayDate.setDate(todayDate.getDate() - 1);
+    if (todayDate.getHours() < getCurrentResetHour()) todayDate.setDate(todayDate.getDate() - 1);
     const activeTodayTasks = recurringTasks.filter(t => !t.deleted && isTaskActiveOnDate(t, todayDate));
 
     if (activeTodayTasks.length > 0) {
@@ -2683,7 +2710,7 @@ function calculateRecurringStreak() {
         recurringHistory.forEach(h => {
             if (h.completedAt && h.recurringId) {
                 const hDate = new Date(h.completedAt);
-                if (hDate.getHours() < 6) hDate.setDate(hDate.getDate() - 1);
+                if (hDate.getHours() < getResetHourForTimestamp(hDate)) hDate.setDate(hDate.getDate() - 1);
                 if (getDateString(hDate) === dateStr && activeIds.includes(h.recurringId)) {
                     completedOnDay.add(h.recurringId);
                 }
@@ -2762,7 +2789,7 @@ function calculateRecurringConsistency(range) {
             recurringHistory.forEach(t => {
                 if (t.completedAt) {
                     const tDate = new Date(t.completedAt);
-                    if (tDate.getHours() < 6) tDate.setDate(tDate.getDate() - 1);
+                    if (tDate.getHours() < getResetHourForTimestamp(tDate)) tDate.setDate(tDate.getDate() - 1);
                     if (getDateString(tDate) === dateStr && t.recurringId) {
                         // Only count if this task was active on this day
                         if (activeTaskIds.includes(t.recurringId)) {
@@ -2813,7 +2840,7 @@ function calculateRecurringConsistency(range) {
                 recurringHistory.forEach(t => {
                     if (t.completedAt) {
                         const tDate = new Date(t.completedAt);
-                        if (tDate.getHours() < 6) tDate.setDate(tDate.getDate() - 1);
+                        if (tDate.getHours() < getResetHourForTimestamp(tDate)) tDate.setDate(tDate.getDate() - 1);
                         if (getDateString(tDate) === dateStr && t.recurringId) {
                             if (activeTaskIds.includes(t.recurringId)) {
                                 completedOnDay.add(t.recurringId);
@@ -2862,7 +2889,7 @@ function calculateRecurringConsistency(range) {
                 recurringHistory.forEach(t => {
                     if (t.completedAt) {
                         const tDate = new Date(t.completedAt);
-                        if (tDate.getHours() < 6) tDate.setDate(tDate.getDate() - 1);
+                        if (tDate.getHours() < getResetHourForTimestamp(tDate)) tDate.setDate(tDate.getDate() - 1);
                         if (getDateString(tDate) === dateStr && t.recurringId) {
                             if (activeTaskIds.includes(t.recurringId)) {
                                 completedOnDay.add(t.recurringId);
@@ -2912,7 +2939,7 @@ function calculateRecurringConsistency(range) {
                     recurringHistory.forEach(t => {
                         if (t.completedAt) {
                             const tDate = new Date(t.completedAt);
-                            if (tDate.getHours() < 6) tDate.setDate(tDate.getDate() - 1);
+                            if (tDate.getHours() < getResetHourForTimestamp(tDate)) tDate.setDate(tDate.getDate() - 1);
                             if (getDateString(tDate) === dateStr && t.recurringId) {
                                 if (activeTaskIds.includes(t.recurringId)) {
                                     completedOnDay.add(t.recurringId);
@@ -2991,7 +3018,7 @@ async function runBackfillJan31() {
                 if (!h.completedAt) return false;
                 const d = new Date(h.completedAt);
                 // Adjust for 6am day start if needed, but simple date string check usually enough for this specific request
-                if (d.getHours() < 6) d.setDate(d.getDate() - 1);
+                if (d.getHours() < getResetHourForTimestamp(d)) d.setDate(d.getDate() - 1);
                 return getDateString(d) === backfillDateStr && h.recurringId === task.id;
             });
 
