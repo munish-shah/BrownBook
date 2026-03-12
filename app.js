@@ -103,7 +103,8 @@ const THEME_COLORS = {
     default: '#1A1816', midnight: '#1A1A2E', forest: '#141E14',
     ocean: '#0F1923', rose: '#1E1418', charcoal: '#1C1C1E',
     obsidian: '#0A0A0A', cyber: '#0D0D1A', ember: '#1A1210',
-    slate: '#15191E', mocha: '#1E1714', aurora: '#0E1A1A'
+    slate: '#15191E', mocha: '#1E1714', aurora: '#0E1A1A',
+    starnight: '#181A28', starday: '#EBF4F4'
 };
 
 function applyTheme(themeName) {

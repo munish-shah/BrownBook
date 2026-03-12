@@ -354,6 +354,54 @@
     --input-bg: #182C2C;
 }
 
+/* ===== Theme: StarNight ===== */
+[data-theme="starnight"] {
+    --bg-primary: url('assets/starnight.png') center/cover no-repeat fixed;
+    --bg-secondary: rgba(20, 24, 40, 0.4);
+    --bg-sidebar: rgba(10, 14, 30, 0.45);
+    --card-bg: rgba(30, 35, 60, 0.6);
+    --accent-warm: #a29bfe;
+    --accent-warm-dark: #6c5ce7;
+    --accent-gold: #f9ca24;
+    --accent-gold-dark: #f0932b;
+    --coin-center: #2d3436;
+    --success-green: #00b894;
+    --success-green-dark: #008764;
+    --text-primary: #dfe6e9;
+    --text-secondary: #b2bec3;
+    --text-muted: #636e72;
+    --border-color: rgba(255, 255, 255, 0.15);
+    --input-bg: rgba(45, 52, 54, 0.5);
+}
+[data-theme="starnight"] .sidebar, [data-theme="starnight"] .card, [data-theme="starnight"] .modal-content, [data-theme="starnight"] .task-card, [data-theme="starnight"] .task-row {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+/* ===== Theme: StarDay ===== */
+[data-theme="starday"] {
+    --bg-primary: url('assets/starday.png') center/cover no-repeat fixed;
+    --bg-secondary: rgba(255, 255, 255, 0.35);
+    --bg-sidebar: rgba(255, 255, 255, 0.5);
+    --card-bg: rgba(255, 255, 255, 0.55);
+    --accent-warm: #e17055;
+    --accent-warm-dark: #d63031;
+    --accent-gold: #fdcb6e;
+    --accent-gold-dark: #e17055;
+    --coin-center: #ffeaa7;
+    --success-green: #00b894;
+    --success-green-dark: #008764;
+    --text-primary: #2d3436;
+    --text-secondary: #636e72;
+    --text-muted: #b2bec3;
+    --border-color: rgba(0, 0, 0, 0.1);
+    --input-bg: rgba(255, 255, 255, 0.6);
+}
+[data-theme="starday"] .sidebar, [data-theme="starday"] .card, [data-theme="starday"] .modal-content, [data-theme="starday"] .task-card, [data-theme="starday"] .task-row {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
 /* ===== Custom Scrollbar ===== */
 ::-webkit-scrollbar {
     width: 8px;
