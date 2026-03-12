@@ -1055,6 +1055,19 @@ function isRecurringCompletedToday(taskId) {
     return appData.recurringCompletions[taskId] === today;
 }
 
+// Check if ALL active recurring tasks for today are checked off
+function isAllActiveRecurringTasksCompletedToday() {
+    const todayDate = new Date();
+    if (todayDate.getHours() < getCurrentResetHour()) todayDate.setDate(todayDate.getDate() - 1);
+    
+    // Find all recurring tasks that are supposed to be done today
+    const activeTodayTasks = appData.recurringTasks.filter(t => !t.deleted && isTaskActiveOnDate(t, todayDate));
+    if (activeTodayTasks.length === 0) return false;
+    
+    // Check if every single one is completed
+    return activeTodayTasks.every(t => isRecurringCompletedToday(t.id));
+}
+
 // DST-safe day difference: uses UTC to avoid 23/25-hour day issues
 function daysBetweenDates(startDate, endDate) {
     const utcStart = Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
@@ -1789,6 +1802,11 @@ function toggleRecurringTask(id) {
         incrementTaskCount(task.difficulty);
         appData.recurringCompletions[id] = today;
 
+        // Check if this completion finished the whole daily list - award Early Bird Bonus
+        if (isAllActiveRecurringTasksCompletedToday()) {
+            awardEarlyBirdBonus(id);
+        }
+
         // Log to completedHistory for permanent record
         appData.completedHistory.unshift({
             id: 'recurring_' + id + '_' + Date.now(),
@@ -1843,6 +1861,59 @@ function showCoinPopup(taskId, coins) {
     row.appendChild(popup);
 
     setTimeout(() => popup.remove(), 800);
+}
+
+// Calculate and award the Early Bird Daily Bonus
+function awardEarlyBirdBonus(lastTaskId) {
+    const todayStr = getTodayDateString();
+    if (appData.stats.lastEarlyBirdBonusDate === todayStr) return; // Already awarded today
+
+    const todayDate = new Date();
+    if (todayDate.getHours() < getCurrentResetHour()) todayDate.setDate(todayDate.getDate() - 1);
+    
+    // Get all tasks active for today
+    const activeTodayTasks = appData.recurringTasks.filter(t => !t.deleted && isTaskActiveOnDate(t, todayDate));
+    if (activeTodayTasks.length === 0) return;
+    
+    // Sum their base coins
+    let totalBaseCoins = 0;
+    activeTodayTasks.forEach(t => {
+        totalBaseCoins += DIFFICULTIES[t.difficulty].coins;
+    });
+
+    const now = new Date();
+    const hour = now.getHours();
+    let multiplier = 0;
+
+    // Evaluate tiers (before 9 PM = +50%, before 10 PM = +25%)
+    if (hour >= getCurrentResetHour() && hour < 21) {
+        multiplier = 0.5; // Tier 1: 1.5x total payout (50% bonus)
+    } else if (hour >= 21 && hour < 22) {
+        multiplier = 0.25; // Tier 2: 1.25x total payout (25% bonus)
+    }
+
+    if (multiplier > 0) {
+        const bonusCoins = Math.ceil(totalBaseCoins * multiplier);
+        appData.stats.totalCoinsEarned += bonusCoins;
+        appData.stats.currentBalance += bonusCoins;
+        appData.stats.lastEarlyBirdBonusDate = todayStr;
+
+        // Delay popup slightly so it appears after the regular coin popup
+        setTimeout(() => showEarlyBirdPopup(lastTaskId, bonusCoins), 300);
+    }
+}
+
+function showEarlyBirdPopup(taskId, coins) {
+    const row = document.querySelector(`.task-row[data-id="${taskId}"]`);
+    if (!row) return;
+
+    row.style.position = 'relative';
+    const popup = document.createElement('div');
+    popup.className = 'coins-popup early-bird';
+    popup.innerHTML = `+${coins} <span>Early Bird!</span>`;
+    row.appendChild(popup);
+
+    setTimeout(() => popup.remove(), 1200);
 }
 
 function incrementTaskCount(difficulty) {

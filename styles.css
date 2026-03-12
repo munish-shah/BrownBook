@@ -828,6 +828,43 @@ body {
     }
 }
 
+.coins-popup.early-bird {
+    color: #ffd700;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+    font-size: 15px;
+    z-index: 10;
+    animation: earlyBirdFly 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.coins-popup.early-bird span {
+    font-size: 12px;
+    font-weight: 500;
+    opacity: 0.9;
+    background: linear-gradient(90deg, #ffed4a, #ff9800);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+@keyframes earlyBirdFly {
+    0% {
+        opacity: 0;
+        transform: translate(-10px, -20px) scale(0.8);
+    }
+    15% {
+        opacity: 1;
+        transform: translate(0, -40px) scale(1.1);
+    }
+    60% {
+        opacity: 1;
+        transform: translate(0, -60px) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(0, -80px) scale(0.9);
+    }
+}
+
 /* Empty State */
 .empty-state {
     text-align: center;
