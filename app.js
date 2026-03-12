@@ -76,7 +76,7 @@ let isFirstLoad = true;
 // Historical completions will always use the reset hour that was active at the time.
 const DEFAULT_RESET_HOUR = 6; // Original reset hour before any transitions
 const RESET_TRANSITIONS = [
-    { date: '2026-03-12', hour: 2 }, // Moved from 6AM to 2AM
+    { date: '2026-03-13', hour: 2 }, // Moved from 6AM to 2AM (effective March 13)
 ];
 
 // Get the current reset hour (for "what day is it NOW?" checks)
