@@ -377,6 +377,47 @@ async function runMigrationsAndCleanup() {
         }
     }
 
+    // ===== ONE-TIME FIX: Missing Piano Completion for March 22nd =====
+    if (!appData.stats.pianoFixApplied_Mar22) {
+        appData.stats.pianoFixApplied_Mar22 = true;
+        
+        // Find the Piano task
+        const pianoTask = appData.recurringTasks.find(t => t.title && t.title.toLowerCase().includes('piano'));
+        
+        if (pianoTask) {
+            // Check if they already have a March 22 completion for this task to avoid duplicates
+            const hasMar22 = appData.completedHistory.some(h => {
+                if (h.recurringId !== pianoTask.id || !h.completedAt) return false;
+                // Just do a simple date substring check
+                return h.completedAt.startsWith('2026-03-22');
+            });
+            
+            if (!hasMar22) {
+                appData.completedHistory.unshift({
+                    id: 'recurring_' + pianoTask.id + '_manual_fix_mar22',
+                    recurringId: pianoTask.id,
+                    title: pianoTask.title,
+                    notes: pianoTask.notes || '',
+                    difficulty: pianoTask.difficulty,
+                    isRecurring: true,
+                    completed: true,
+                    completedAt: '2026-03-22T19:00:00.000Z' // March 22nd PM
+                });
+                
+                // Award coins and stats
+                const coins = DIFFICULTIES[pianoTask.difficulty]?.coins || 10;
+                appData.stats.totalCoinsEarned += coins;
+                appData.stats.currentBalance += coins;
+                const diffKey = `tasksCompleted${pianoTask.difficulty.charAt(0).toUpperCase()}${pianoTask.difficulty.slice(1)}`;
+                appData.stats[diffKey] = (appData.stats[diffKey] || 0) + 1;
+                
+                console.log("Restored missing Piano completion for March 22.");
+                needsSave = true;
+            }
+        }
+    }
+    // =================================================================
+
     if (needsSave) {
         await saveData();
     }
