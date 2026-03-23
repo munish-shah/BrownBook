@@ -377,54 +377,6 @@ async function runMigrationsAndCleanup() {
         }
     }
 
-    // ===== ONE-TIME FIX v2: Missing Piano Completion for March 22nd =====
-    if (!appData.stats.pianoFixV2_Mar22) {
-        appData.stats.pianoFixV2_Mar22 = true;
-        needsSave = true;
-        
-        const pianoId = 'custom_1768749723730'; // Piano task ID
-        const pianoTask = appData.recurringTasks.find(t => t.id === pianoId);
-        
-        if (pianoTask) {
-            // Check if there's already a completion that maps to March 22 using the SAME
-            // date logic as the progress view (convert UTC timestamp to local, adjust for reset hour)
-            const hasMar22 = appData.completedHistory.some(h => {
-                if (h.recurringId !== pianoId || !h.completedAt) return false;
-                const d = new Date(h.completedAt);
-                if (d.getHours() < getResetHourForTimestamp(d)) d.setDate(d.getDate() - 1);
-                const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                return ds === '2026-03-22';
-            });
-            
-            if (!hasMar22) {
-                // Use a local-friendly timestamp: March 22 at 8 PM CDT = March 23 01:00 UTC
-                appData.completedHistory.unshift({
-                    id: 'recurring_' + pianoId + '_fix_mar22_v2',
-                    recurringId: pianoId,
-                    title: pianoTask.title,
-                    notes: pianoTask.notes || '',
-                    difficulty: pianoTask.difficulty,
-                    isRecurring: true,
-                    completed: true,
-                    completedAt: '2026-03-23T01:00:00.000Z' // = March 22 at 8 PM CDT (well within 6AM boundary)
-                });
-                
-                const coins = DIFFICULTIES[pianoTask.difficulty]?.coins || 10;
-                appData.stats.totalCoinsEarned += coins;
-                appData.stats.currentBalance += coins;
-                const diffKey = `tasksCompleted${pianoTask.difficulty.charAt(0).toUpperCase()}${pianoTask.difficulty.slice(1)}`;
-                appData.stats[diffKey] = (appData.stats[diffKey] || 0) + 1;
-                
-                console.log('Piano fix v2: restored March 22 completion.');
-            } else {
-                console.log('Piano fix v2: March 22 completion already exists.');
-            }
-        } else {
-            console.log('Piano fix v2: task not found.');
-        }
-    }
-    // =================================================================
-
     if (needsSave) {
         await saveData();
     }
