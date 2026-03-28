@@ -377,6 +377,49 @@ async function runMigrationsAndCleanup() {
         }
     }
 
+    // ===== ONE-TIME FIX: Missing completions for March 27th =====
+    if (!appData.stats.fixMar27_v1) {
+        appData.stats.fixMar27_v1 = true;
+        needsSave = true;
+
+        // brush_night, floss, and one of the two Wash Face tasks (whichever is missing for Mar 27)
+        const tasksToFix = ['brush_night', 'floss', 'custom_1771086012235', 'custom_1768322675506'];
+        // March 27 at 10 PM CDT = March 28 03:00 UTC (within 6AM boundary for Mar 27)
+        const fixTimestamp = '2026-03-28T03:00:00.000Z';
+
+        tasksToFix.forEach(taskId => {
+            const task = appData.recurringTasks.find(t => t.id === taskId);
+            if (!task || task.deleted) return;
+
+            const hasMar27 = appData.completedHistory.some(h => {
+                if (h.recurringId !== taskId || !h.completedAt) return false;
+                const d = new Date(h.completedAt);
+                if (d.getHours() < getResetHourForTimestamp(d)) d.setDate(d.getDate() - 1);
+                return getDateString(d) === '2026-03-27';
+            });
+
+            if (!hasMar27) {
+                appData.completedHistory.unshift({
+                    id: 'recurring_' + taskId + '_fix_mar27',
+                    recurringId: taskId,
+                    title: task.title,
+                    notes: task.notes || '',
+                    difficulty: task.difficulty,
+                    isRecurring: true,
+                    completed: true,
+                    completedAt: fixTimestamp
+                });
+                const coins = DIFFICULTIES[task.difficulty]?.coins || 10;
+                appData.stats.totalCoinsEarned += coins;
+                appData.stats.currentBalance += coins;
+                const diffKey = `tasksCompleted${task.difficulty.charAt(0).toUpperCase()}${task.difficulty.slice(1)}`;
+                appData.stats[diffKey] = (appData.stats[diffKey] || 0) + 1;
+                console.log(`Fix Mar27: restored ${task.title}`);
+            }
+        });
+    }
+    // =================================================================
+
     if (needsSave) {
         await saveData();
     }
