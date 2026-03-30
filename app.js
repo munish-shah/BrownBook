@@ -2632,6 +2632,132 @@ function renderProgress() {
 
     // Initialize Lucide icons for dynamically rendered content
     if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    // Render streak history leaderboard
+    const streakHistoryContainer = document.getElementById('streakHistory');
+    if (streakHistoryContainer && progressState.type === 'recurring') {
+        const allStreaks = getAllStreaks();
+        const currentStreak = calculateRecurringStreak();
+
+        if (allStreaks.length > 0) {
+            // Sort by length descending
+            allStreaks.sort((a, b) => b.length - a.length);
+            const maxLen = allStreaks[0].length;
+
+            const rows = allStreaks.map((s, i) => {
+                const isCurrent = s.isCurrent;
+                const rank = i + 1;
+                const barWidth = maxLen > 0 ? Math.max(8, (s.length / maxLen) * 100) : 8;
+                const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
+                const dateRange = `${formatShortDate(s.startDate)} – ${formatShortDate(s.endDate)}`;
+
+                return `
+                    <div class="streak-row ${isCurrent ? 'current' : ''}">
+                        <div class="streak-rank">${medal}</div>
+                        <div class="streak-bar-area">
+                            <div class="streak-bar ${isCurrent ? 'active' : ''}" style="width: ${barWidth}%">
+                                <span class="streak-length">${s.length} day${s.length !== 1 ? 's' : ''}</span>
+                            </div>
+                            <div class="streak-dates">${dateRange}${isCurrent ? ' <span class="streak-active-badge">ACTIVE</span>' : ''}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            streakHistoryContainer.innerHTML = `
+                <div class="streak-leaderboard">
+                    <div class="streak-leaderboard-title">
+                        <i data-lucide="trophy" class="icon icon-gold" style="width:20px;height:20px;"></i>
+                        Streak History
+                    </div>
+                    ${rows}
+                </div>
+            `;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        } else {
+            streakHistoryContainer.innerHTML = '';
+        }
+    } else if (streakHistoryContainer) {
+        streakHistoryContainer.innerHTML = '';
+    }
+}
+
+// Get all historical streaks (consecutive 100% days)
+function getAllStreaks() {
+    const recurringTasks = appData.recurringTasks || [];
+    if (recurringTasks.length === 0) return [];
+
+    const recurringHistory = (appData.completedHistory || []).filter(t => t.isRecurring);
+    const firstUse = getFirstUseDate();
+    const now = new Date();
+    const todayDate = new Date();
+    if (todayDate.getHours() < getCurrentResetHour()) todayDate.setDate(todayDate.getDate() - 1);
+
+    const totalDays = daysBetweenDates(firstUse, now) + 1;
+    const streaks = [];
+    let currentStreakStart = null;
+    let currentStreakLen = 0;
+
+    for (let i = totalDays - 1; i >= 0; i--) {
+        const date = new Date(todayDate);
+        date.setDate(date.getDate() - i);
+        const dateStr = getDateString(date);
+
+        const activeOnDay = recurringTasks.filter(t => isTaskActiveOnDate(t, date));
+        if (activeOnDay.length === 0) continue; // skip days with no tasks
+
+        const activeIds = activeOnDay.map(t => t.id);
+        const completedOnDay = new Set();
+        recurringHistory.forEach(h => {
+            if (h.completedAt && h.recurringId) {
+                const hDate = new Date(h.completedAt);
+                if (hDate.getHours() < getResetHourForTimestamp(hDate)) hDate.setDate(hDate.getDate() - 1);
+                if (getDateString(hDate) === dateStr && activeIds.includes(h.recurringId)) {
+                    completedOnDay.add(h.recurringId);
+                }
+            }
+        });
+
+        const allDone = completedOnDay.size >= activeOnDay.length;
+
+        if (allDone) {
+            if (!currentStreakStart) currentStreakStart = new Date(date);
+            currentStreakLen++;
+        } else {
+            if (currentStreakLen > 0) {
+                const endDate = new Date(date);
+                endDate.setDate(endDate.getDate() - 1);
+                streaks.push({
+                    length: currentStreakLen,
+                    startDate: currentStreakStart,
+                    endDate: endDate,
+                    isCurrent: false
+                });
+            }
+            currentStreakStart = null;
+            currentStreakLen = 0;
+        }
+    }
+
+    // Close final streak (may be the current active one)
+    if (currentStreakLen > 0) {
+        const endDate = new Date(todayDate);
+        const isCurrent = getDateString(endDate) === getDateString(todayDate) ||
+            getDateString(new Date(todayDate.getTime() - 86400000)) === getDateString(endDate);
+        streaks.push({
+            length: currentStreakLen,
+            startDate: currentStreakStart,
+            endDate: endDate,
+            isCurrent: true
+        });
+    }
+
+    return streaks;
+}
+
+function formatShortDate(date) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${months[date.getMonth()]} ${date.getDate()}`;
 }
 
 function renderBarChart(data) {
