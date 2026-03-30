@@ -378,6 +378,38 @@ async function runMigrationsAndCleanup() {
     }
 
 
+    // ===== ONE-TIME FIX: Missing Read & Floss for March 29th =====
+    if (!appData.stats.fixMar29_v1) {
+        appData.stats.fixMar29_v1 = true;
+        needsSave = true;
+        const tasksToFix = ['custom_1770492252544', 'floss']; // Read, Floss
+        const fixTimestamp = '2026-03-30T03:00:00.000Z'; // Mar 29 10PM CDT
+        tasksToFix.forEach(taskId => {
+            const task = appData.recurringTasks.find(t => t.id === taskId);
+            if (!task || task.deleted) return;
+            const has = appData.completedHistory.some(h => {
+                if (h.recurringId !== taskId || !h.completedAt) return false;
+                const d = new Date(h.completedAt);
+                if (d.getHours() < getResetHourForTimestamp(d)) d.setDate(d.getDate() - 1);
+                return getDateString(d) === '2026-03-29';
+            });
+            if (!has) {
+                appData.completedHistory.unshift({
+                    id: 'recurring_' + taskId + '_fix_mar29',
+                    recurringId: taskId, title: task.title, notes: task.notes || '',
+                    difficulty: task.difficulty, isRecurring: true, completed: true,
+                    completedAt: fixTimestamp
+                });
+                const coins = DIFFICULTIES[task.difficulty]?.coins || 10;
+                appData.stats.totalCoinsEarned += coins;
+                appData.stats.currentBalance += coins;
+                const dk = `tasksCompleted${task.difficulty.charAt(0).toUpperCase()}${task.difficulty.slice(1)}`;
+                appData.stats[dk] = (appData.stats[dk] || 0) + 1;
+            }
+        });
+    }
+    // =============================================================
+
     if (needsSave) {
         await saveData();
     }
