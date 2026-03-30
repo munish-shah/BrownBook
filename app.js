@@ -2640,20 +2640,20 @@ function renderProgress() {
         const currentStreak = calculateRecurringStreak();
 
         if (allStreaks.length > 0) {
-            // Sort by length descending
+            // Sort by length descending, take top 3
             allStreaks.sort((a, b) => b.length - a.length);
-            const maxLen = allStreaks[0].length;
+            const top3 = allStreaks.slice(0, 3);
+            const maxLen = top3[0].length;
 
-            const rows = allStreaks.map((s, i) => {
+            const rankColors = ['icon-gold', 'icon-gray', 'icon-orange'];
+            const rows = top3.map((s, i) => {
                 const isCurrent = s.isCurrent;
-                const rank = i + 1;
                 const barWidth = maxLen > 0 ? Math.max(8, (s.length / maxLen) * 100) : 8;
-                const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
                 const dateRange = `${formatShortDate(s.startDate)} – ${formatShortDate(s.endDate)}`;
 
                 return `
                     <div class="streak-row ${isCurrent ? 'current' : ''}">
-                        <div class="streak-rank">${medal}</div>
+                        <div class="streak-rank"><i data-lucide="award" class="icon ${rankColors[i] || 'icon-gray'}" style="width:20px;height:20px;"></i></div>
                         <div class="streak-bar-area">
                             <div class="streak-bar ${isCurrent ? 'active' : ''}" style="width: ${barWidth}%">
                                 <span class="streak-length">${s.length} day${s.length !== 1 ? 's' : ''}</span>
