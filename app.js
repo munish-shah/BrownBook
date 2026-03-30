@@ -378,6 +378,36 @@ async function runMigrationsAndCleanup() {
     }
 
 
+    // ===== ONE-TIME FIX: Missing Piano for March 28th =====
+    if (!appData.stats.fixPianoMar28) {
+        appData.stats.fixPianoMar28 = true;
+        needsSave = true;
+        const pianoId = 'custom_1768749723730';
+        const task = appData.recurringTasks.find(t => t.id === pianoId);
+        if (task) {
+            const has = appData.completedHistory.some(h => {
+                if (h.recurringId !== pianoId || !h.completedAt) return false;
+                const d = new Date(h.completedAt);
+                if (d.getHours() < getResetHourForTimestamp(d)) d.setDate(d.getDate() - 1);
+                return getDateString(d) === '2026-03-28';
+            });
+            if (!has) {
+                appData.completedHistory.unshift({
+                    id: 'recurring_' + pianoId + '_fix_mar28',
+                    recurringId: pianoId, title: task.title, notes: task.notes || '',
+                    difficulty: task.difficulty, isRecurring: true, completed: true,
+                    completedAt: '2026-03-29T03:00:00.000Z' // Mar 28 10PM CDT
+                });
+                const coins = DIFFICULTIES[task.difficulty]?.coins || 10;
+                appData.stats.totalCoinsEarned += coins;
+                appData.stats.currentBalance += coins;
+                const dk = `tasksCompleted${task.difficulty.charAt(0).toUpperCase()}${task.difficulty.slice(1)}`;
+                appData.stats[dk] = (appData.stats[dk] || 0) + 1;
+            }
+        }
+    }
+    // =============================================================
+
     if (needsSave) {
         await saveData();
     }
