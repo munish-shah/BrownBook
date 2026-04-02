@@ -92,6 +92,10 @@
     background: #F44336;
 }
 
+.diff-dot.diff-placeholder {
+    background: var(--text-muted);
+}
+
 :root {
     /* Default: Dark Warm */
     --bg-primary: #1A1816;
@@ -121,6 +125,7 @@
     --diff-medium: #FFC82D;
     --diff-hard: #FF9828;
     --diff-epic: #E75757;
+    --diff-placeholder: #78909C;
 
     /* Shadows */
     --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -756,6 +761,10 @@ body {
 
 .task-checkbox.epic {
     border-color: var(--diff-epic);
+}
+
+.task-checkbox.placeholder {
+    border-color: var(--diff-placeholder);
 }
 
 .task-content {
@@ -1442,6 +1451,16 @@ body {
 .diff-btn[data-difficulty="hard"].selected {
     border-color: var(--diff-hard);
     background: rgba(255, 152, 40, 0.1);
+}
+
+.diff-btn[data-difficulty="epic"].selected {
+    border-color: var(--diff-epic);
+    background: rgba(231, 87, 87, 0.1);
+}
+
+.diff-btn[data-difficulty="placeholder"].selected {
+    border-color: var(--diff-placeholder);
+    background: rgba(120, 144, 156, 0.1);
 }
 
 .diff-btn[data-difficulty="epic"].selected {

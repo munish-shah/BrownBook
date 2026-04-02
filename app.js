@@ -18,7 +18,8 @@ const DIFFICULTIES = {
     easy: { emoji: '<span class="diff-dot diff-easy"></span>', name: 'Easy', coins: 15, time: '5-15 min' },
     medium: { emoji: '<span class="diff-dot diff-medium"></span>', name: 'Medium', coins: 25, time: '15-45 min' },
     hard: { emoji: '<span class="diff-dot diff-hard"></span>', name: 'Hard', coins: 50, time: '45-90 min' },
-    epic: { emoji: '<span class="diff-dot diff-epic"></span>', name: 'Epic', coins: 75, time: '2+ hours' }
+    epic: { emoji: '<span class="diff-dot diff-epic"></span>', name: 'Epic', coins: 75, time: '2+ hours' },
+    placeholder: { emoji: '<span class="diff-dot diff-placeholder"></span>', name: 'Placeholder', coins: 0, time: 'Routine' }
 };
 
 const CATEGORIES = {
@@ -687,6 +688,17 @@ function setupEventListeners() {
         document.getElementById('recurringOptions').style.display = e.target.checked ? 'block' : 'none';
         // Hide expiration for recurring tasks (they reset, not expire)
         document.getElementById('expirationOptions').style.display = e.target.checked ? 'none' : 'block';
+        
+        // Prevent Placeholders from being recurring
+        if (e.target.checked) {
+            const placeholderBtn = document.querySelector('.diff-btn[data-difficulty="placeholder"]');
+            if (placeholderBtn.classList.contains('selected')) {
+                selectDifficulty(document.querySelector('.diff-btn[data-difficulty="quick"]'));
+            }
+            placeholderBtn.style.display = 'none';
+        } else {
+            document.querySelector('.diff-btn[data-difficulty="placeholder"]').style.display = '';
+        }
     });
 
     // Recurrence type radio
@@ -1577,6 +1589,8 @@ function openAddTaskModal() {
     document.getElementById('subtaskListInput').innerHTML = '';
     document.getElementById('subtaskValidationMsg').style.display = 'none';
 
+    document.querySelector('.diff-btn[data-difficulty="placeholder"]').style.display = '';
+
     selectDifficulty(document.querySelector('.diff-btn[data-difficulty="medium"]'));
     document.getElementById('taskTitle').focus();
 }
@@ -1589,9 +1603,20 @@ function selectDifficulty(btn) {
     document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('selected'));
     btn.classList.add('selected');
 
-    const diff = DIFFICULTIES[btn.dataset.difficulty];
+    const diffName = btn.dataset.difficulty;
+    const diff = DIFFICULTIES[diffName];
     document.getElementById('timeEstimate').textContent = diff.time;
     document.getElementById('coinReward').textContent = diff.coins;
+
+    const recurringToggle = document.getElementById('recurringTaskToggle');
+    if (diffName === 'placeholder') {
+        recurringToggle.checked = false;
+        recurringToggle.disabled = true;
+        document.getElementById('recurringOptions').style.display = 'none';
+        document.getElementById('expirationOptions').style.display = 'block';
+    } else {
+        recurringToggle.disabled = false;
+    }
 }
 
 function saveNewTask() {
@@ -1714,6 +1739,16 @@ function toggleTask(id) {
 
     const task = appData.tasks[taskIndex];
 
+    if (task.difficulty === 'placeholder') {
+        // Just permanently delete it, no coins, no history
+        appData.tasks.splice(taskIndex, 1);
+        appData.focusPinnedIds = appData.focusPinnedIds.filter(id => id !== task.id);
+        saveData();
+        renderTasks();
+        if (typeof renderFocus === 'function') renderFocus();
+        return;
+    }
+
     // Complete the task - add coins and move to history
     task.completed = true;
     task.completedAt = new Date().toISOString();
@@ -1733,6 +1768,7 @@ function toggleTask(id) {
     renderTasks();
     renderHistory();
     updateCoinDisplay();
+    if (typeof renderFocus === 'function') renderFocus();
 }
 
 function uncompleteTask(id) {
