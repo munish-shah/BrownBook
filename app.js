@@ -378,62 +378,6 @@ async function runMigrationsAndCleanup() {
         }
     }
 
-    // ===== ONE-TIME FIX: Undo April 10, apply to April 9 =====
-    if (!appData.stats.fixApril9_v1) {
-        appData.stats.fixApril9_v1 = true;
-        needsSave = true;
-
-        // 1. Revert April 10th
-        const deletedTaskDifficulties = [];
-        appData.completedHistory = appData.completedHistory.filter(h => {
-            if (h.id && h.id.endsWith('_fix_apr10')) {
-                deletedTaskDifficulties.push(h.difficulty);
-                return false; // remove it
-            }
-            return true;
-        });
-
-        deletedTaskDifficulties.forEach(diff => {
-            const coins = DIFFICULTIES[diff]?.coins || 10;
-            appData.stats.totalCoinsEarned = Math.max(0, appData.stats.totalCoinsEarned - coins);
-            appData.stats.currentBalance = Math.max(0, appData.stats.currentBalance - coins);
-            const dk = `tasksCompleted${diff.charAt(0).toUpperCase()}${diff.slice(1)}`;
-            if (appData.stats[dk] > 0) Object.assign(appData.stats, { [dk]: appData.stats[dk] - 1 });
-        });
-
-        // 2. Apply for April 9th
-        const tasksToFix = [
-            appData.recurringTasks.find(t => t.id === 'brush_night' || (t.title.toLowerCase().includes('brush') && (t.notes || '').toLowerCase().includes('night'))),
-            appData.recurringTasks.find(t => t.id === 'floss' || t.title.toLowerCase().includes('floss')),
-            appData.recurringTasks.find(t => t.title.toLowerCase().includes('wash face'))
-        ].filter(Boolean);
-
-        const fixTimestamp = '2026-04-10T03:00:00.000Z'; // April 9 10PM CDT
-        
-        tasksToFix.forEach(task => {
-            if (task.deleted) return;
-            const has = appData.completedHistory.some(h => {
-                if (h.recurringId !== task.id || !h.completedAt) return false;
-                const d = new Date(h.completedAt);
-                if (d.getHours() < getResetHourForTimestamp(d)) d.setDate(d.getDate() - 1);
-                return getDateString(d) === '2026-04-09';
-            });
-            if (!has) {
-                appData.completedHistory.unshift({
-                    id: 'recurring_' + task.id + '_fix_apr9',
-                    recurringId: task.id, title: task.title, notes: task.notes || '',
-                    difficulty: task.difficulty, isRecurring: true, completed: true,
-                    completedAt: fixTimestamp
-                });
-                const coins = DIFFICULTIES[task.difficulty]?.coins || 10;
-                appData.stats.totalCoinsEarned += coins;
-                appData.stats.currentBalance += coins;
-                const dk = `tasksCompleted${task.difficulty.charAt(0).toUpperCase()}${task.difficulty.slice(1)}`;
-                appData.stats[dk] = (appData.stats[dk] || 0) + 1;
-            }
-        });
-    }
-    // =============================================================
 
     if (needsSave) {
         await saveData();
