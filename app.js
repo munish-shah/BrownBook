@@ -2770,8 +2770,10 @@ function getAllStreaks() {
             }
         });
 
-        // Vacation days count as 100% complete
-        const allDone = completedOnDay.size >= activeOnDay.length || isVacationDay(dateStr);
+        // Vacation days are no-count: skip entirely (don't add to streak, don't break it)
+        if (isVacationDay(dateStr)) continue;
+
+        const allDone = completedOnDay.size >= activeOnDay.length;
 
         if (allDone) {
             if (!currentStreakStart) currentStreakStart = new Date(date);
@@ -2818,11 +2820,14 @@ function renderBarChart(data) {
     const barsHTML = data.map(d => {
         const roundedRate = Math.round(d.rate);
         const height = Math.max(4, (d.rate / 100) * maxHeight);
-        const colorClass = d.rate >= 80 ? 'high' : d.rate >= 50 ? 'medium' : 'low';
+        // Vacation days get a special blue bar; others use normal color tiers
+        const colorClass = d.isVacation ? 'vacation' : (d.rate >= 80 ? 'high' : d.rate >= 50 ? 'medium' : 'low');
 
         // Build tooltip content if completedIds exists (daily view)
         let tooltipHTML = '';
-        if (d.completedIds && d.activeTaskIds) {
+        if (d.isVacation) {
+            tooltipHTML = `<div class="bar-tooltip"><div class="tooltip-task vacation-tip">🏖️ Vacation Day</div></div>`;
+        } else if (d.completedIds && d.activeTaskIds) {
             // Only show tasks that were scheduled for this day
             const activeTasks = appData.recurringTasks.filter(t => d.activeTaskIds.includes(t.id));
             if (activeTasks.length === 0) {
@@ -2839,8 +2844,8 @@ function renderBarChart(data) {
         }
 
         return `
-            <div class="chart-bar" ${d.completedIds ? 'data-has-tooltip="true"' : ''}>
-                <div class="bar-value">${roundedRate}%</div>
+            <div class="chart-bar" ${(d.completedIds || d.isVacation) ? 'data-has-tooltip="true"' : ''}>
+                <div class="bar-value">${d.isVacation ? '🏖️' : roundedRate + '%'}</div>
                 <div class="bar-fill-container">
                     <div class="bar-fill ${colorClass}" style="height: ${height}px;"></div>
                 </div>
@@ -2936,10 +2941,13 @@ function calculateRecurringStreak() {
     if (todayDate.getHours() < getCurrentResetHour()) todayDate.setDate(todayDate.getDate() - 1);
     const activeTodayTasks = recurringTasks.filter(t => !t.deleted && isTaskActiveOnDate(t, todayDate));
 
-    if (activeTodayTasks.length > 0) {
-        const allCompletedToday = activeTodayTasks.every(t => isRecurringCompletedToday(t.id));
-        if (allCompletedToday) {
-            streak = 1;
+    // Today is a vacation day: skip it (don't count, don't break)
+    if (!isVacationDay(getTodayDateString())) {
+        if (activeTodayTasks.length > 0) {
+            const allCompletedToday = activeTodayTasks.every(t => isRecurringCompletedToday(t.id));
+            if (allCompletedToday) {
+                streak = 1;
+            }
         }
     }
 
@@ -2967,8 +2975,11 @@ function calculateRecurringStreak() {
             }
         });
 
-        // Were ALL active tasks completed? Vacation days count as 100%
-        if (completedOnDay.size >= activeOnDay.length || isVacationDay(dateStr)) {
+        // Vacation days are no-count: skip entirely (don't add to streak, don't break it)
+        if (isVacationDay(dateStr)) continue;
+
+        // Were ALL active tasks completed?
+        if (completedOnDay.size >= activeOnDay.length) {
             streak++;
         } else {
             break; // Streak broken

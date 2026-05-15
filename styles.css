@@ -2363,6 +2363,16 @@ input[type="range"]::-webkit-slider-thumb {
     background: linear-gradient(180deg, #6bcb77 0%, #4ade80 100%);
 }
 
+.bar-fill.vacation {
+    background: linear-gradient(180deg, #48cae4 0%, #0077b6 100%);
+}
+
+.tooltip-task.vacation-tip {
+    color: #48cae4;
+    font-weight: 600;
+    text-align: center;
+}
+
 .bar-label {
     font-size: 10px;
     color: var(--text-muted);
