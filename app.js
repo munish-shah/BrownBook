@@ -51,6 +51,7 @@ let appData = {
     rewards: [],
     customShopItems: [],
     focusPinnedIds: [], // Ordered list of pinned task IDs for Focus section
+    vacationDays: ['2026-05-15', '2026-05-16'], // Dates treated as 100% (streak protected)
     stats: {
         totalCoinsEarned: 0,
         currentBalance: 0,
@@ -263,6 +264,7 @@ async function runMigrationsAndCleanup() {
     if (!appData.recurringTasks) { appData.recurringTasks = []; needsSave = true; }
     if (!appData.recurringCompletions) { appData.recurringCompletions = {}; needsSave = true; }
     if (!appData.completedHistory) { appData.completedHistory = []; needsSave = true; }
+    if (!appData.vacationDays) { appData.vacationDays = ['2026-05-15', '2026-05-16']; needsSave = true; }
 
     // Migrate completed tasks
     const completedInTasks = appData.tasks.filter(t => t.completed);
@@ -1151,6 +1153,12 @@ function renderTasks() {
         totalRemaining === 1
             ? '1 task remaining'
             : `${totalRemaining} tasks remaining`;
+
+    // Vacation banner
+    const vacationBanner = document.getElementById('vacationBanner');
+    if (vacationBanner) {
+        vacationBanner.style.display = isVacationDay(today) ? 'flex' : 'none';
+    }
 
     // Show/hide sections
     const hasRecurring = recurringNotCompleted.length > 0;
@@ -2721,6 +2729,11 @@ function renderProgress() {
     }
 }
 
+// Check if a given date string (YYYY-MM-DD) is a vacation day
+function isVacationDay(dateStr) {
+    return (appData.vacationDays || []).includes(dateStr);
+}
+
 // Get all historical streaks (consecutive 100% days)
 function getAllStreaks() {
     const recurringTasks = appData.recurringTasks || [];
@@ -2757,7 +2770,8 @@ function getAllStreaks() {
             }
         });
 
-        const allDone = completedOnDay.size >= activeOnDay.length;
+        // Vacation days count as 100% complete
+        const allDone = completedOnDay.size >= activeOnDay.length || isVacationDay(dateStr);
 
         if (allDone) {
             if (!currentStreakStart) currentStreakStart = new Date(date);
@@ -2953,8 +2967,8 @@ function calculateRecurringStreak() {
             }
         });
 
-        // Were ALL active tasks completed?
-        if (completedOnDay.size >= activeOnDay.length) {
+        // Were ALL active tasks completed? Vacation days count as 100%
+        if (completedOnDay.size >= activeOnDay.length || isVacationDay(dateStr)) {
             streak++;
         } else {
             break; // Streak broken
@@ -3041,15 +3055,17 @@ function calculateRecurringConsistency(range) {
             // Skip days with no tasks scheduled (don't inflate average)
             if (tasksExpected === 0) continue;
 
-            const rate = (completedOnDay.size / tasksExpected) * 100;
+            // Vacation days always show 100%
+            const rate = isVacationDay(dateStr) ? 100 : (completedOnDay.size / tasksExpected) * 100;
             const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
             data.push({
                 label: i === 0 ? 'Today' : i === 1 ? 'Yest' : dayNames[date.getDay()],
                 rate: rate,
-                count: completedOnDay.size,
+                count: isVacationDay(dateStr) ? tasksExpected : completedOnDay.size,
                 expected: tasksExpected,
-                completedIds: Array.from(completedOnDay),
-                activeTaskIds: activeTaskIds
+                completedIds: isVacationDay(dateStr) ? activeTaskIds : Array.from(completedOnDay),
+                activeTaskIds: activeTaskIds,
+                isVacation: isVacationDay(dateStr)
             });
         }
     } else if (range === 'weekly') {

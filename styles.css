@@ -1599,6 +1599,38 @@ input[type="range"]::-webkit-slider-thumb {
     margin-bottom: 32px;
 }
 
+/* Vacation Banner */
+.vacation-banner {
+    background: linear-gradient(135deg, #00b4d8 0%, #0077b6 40%, #48cae4 100%);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: var(--radius-lg);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 16px 0;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.5px;
+    animation: vacation-glow 2.5s ease-in-out infinite;
+    box-shadow: 0 4px 20px rgba(0, 180, 216, 0.45);
+}
+
+@keyframes vacation-glow {
+    0%, 100% { box-shadow: 0 4px 20px rgba(0, 180, 216, 0.45); }
+    50%       { box-shadow: 0 4px 32px rgba(0, 180, 216, 0.75); }
+}
+
+.vacation-icon {
+    font-size: 20px;
+}
+
+.vacation-text {
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
 /* Weekend Sale Banner */
 .sale-banner {
     background: linear-gradient(135deg, #ff6b6b 0%, #f5a623 50%, #ffd93d 100%);
