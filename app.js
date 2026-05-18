@@ -51,7 +51,7 @@ let appData = {
     rewards: [],
     customShopItems: [],
     focusPinnedIds: [], // Ordered list of pinned task IDs for Focus section
-    vacationDays: ['2026-05-15', '2026-05-16'], // Dates treated as 100% (streak protected)
+    vacationDays: ['2026-05-15', '2026-05-16', '2026-05-17'], // Dates treated as 100% (streak protected)
     stats: {
         totalCoinsEarned: 0,
         currentBalance: 0,
@@ -264,7 +264,7 @@ async function runMigrationsAndCleanup() {
     if (!appData.recurringTasks) { appData.recurringTasks = []; needsSave = true; }
     if (!appData.recurringCompletions) { appData.recurringCompletions = {}; needsSave = true; }
     if (!appData.completedHistory) { appData.completedHistory = []; needsSave = true; }
-    if (!appData.vacationDays) { appData.vacationDays = ['2026-05-15', '2026-05-16']; needsSave = true; }
+    if (!appData.vacationDays) { appData.vacationDays = ['2026-05-15', '2026-05-16', '2026-05-17']; needsSave = true; }
 
     // Migrate completed tasks
     const completedInTasks = appData.tasks.filter(t => t.completed);
@@ -2650,10 +2650,11 @@ function renderProgress() {
     const chartHTML = renderBarChart(data);
     chartContainer.innerHTML = chartHTML;
 
-    // Render summary - simple average of displayed bar percentages
-    const avgRate = data.length > 0 ? Math.round(data.reduce((sum, d) => sum + d.rate, 0) / data.length) : 0;
+    // Render summary - simple average of displayed bar percentages (excluding vacation days)
+    const nonVacationData = data.filter(d => !d.isVacation);
+    const avgRate = nonVacationData.length > 0 ? Math.round(nonVacationData.reduce((sum, d) => sum + d.rate, 0) / nonVacationData.length) : 0;
     const avgClass = avgRate >= 80 ? 'good' : avgRate >= 50 ? 'okay' : 'poor';
-    const bestItem = data.reduce((best, d) => d.rate > best.rate ? d : best, data[0]);
+    const bestItem = nonVacationData.length > 0 ? nonVacationData.reduce((best, d) => d.rate > best.rate ? d : best, nonVacationData[0]) : (data[0] || {label: 'None', rate: 0});
     const periodLabel = progressState.range === 'daily' ? 'Day' :
         progressState.range === 'weekly' ? 'Week' :
             progressState.range === 'monthly' ? 'Month' : 'Year';
@@ -3095,7 +3096,7 @@ function calculateRecurringConsistency(range) {
 
                 // Get tasks that were ACTIVE on this day
                 const activeTasksOnDay = appData.recurringTasks.filter(task => isTaskActiveOnDate(task, date));
-                if (activeTasksOnDay.length === 0) continue;
+                if (activeTasksOnDay.length === 0 || isVacationDay(dateStr)) continue;
 
                 const activeTaskIds = activeTasksOnDay.map(t => t.id);
 
@@ -3144,7 +3145,7 @@ function calculateRecurringConsistency(range) {
 
                 // Get tasks that were ACTIVE on this day
                 const activeTasksOnDay = appData.recurringTasks.filter(task => isTaskActiveOnDate(task, date));
-                if (activeTasksOnDay.length === 0) continue;
+                if (activeTasksOnDay.length === 0 || isVacationDay(dateStr)) continue;
 
                 const activeTaskIds = activeTasksOnDay.map(t => t.id);
 
@@ -3194,7 +3195,7 @@ function calculateRecurringConsistency(range) {
 
                     // Get tasks that were ACTIVE on this day
                     const activeTasksOnDay = appData.recurringTasks.filter(task => isTaskActiveOnDate(task, date));
-                    if (activeTasksOnDay.length === 0) continue;
+                    if (activeTasksOnDay.length === 0 || isVacationDay(dateStr)) continue;
 
                     const activeTaskIds = activeTasksOnDay.map(t => t.id);
 
