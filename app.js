@@ -264,7 +264,13 @@ async function runMigrationsAndCleanup() {
     if (!appData.recurringTasks) { appData.recurringTasks = []; needsSave = true; }
     if (!appData.recurringCompletions) { appData.recurringCompletions = {}; needsSave = true; }
     if (!appData.completedHistory) { appData.completedHistory = []; needsSave = true; }
-    if (!appData.vacationDays) { appData.vacationDays = ['2026-05-15', '2026-05-16', '2026-05-17']; needsSave = true; }
+    if (!appData.vacationDays) { 
+        appData.vacationDays = ['2026-05-15', '2026-05-16', '2026-05-17']; 
+        needsSave = true; 
+    } else if (!appData.vacationDays.includes('2026-05-17')) {
+        appData.vacationDays.push('2026-05-17');
+        needsSave = true;
+    }
 
     // Migrate completed tasks
     const completedInTasks = appData.tasks.filter(t => t.completed);
