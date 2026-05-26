@@ -198,7 +198,6 @@ async function init() {
             if (isFirstLoad) {
                 runMigrationsAndCleanup();
                 runBackfillJan31(); // One-time fix for missing Jan 31st tasks
-                runBackfillMay26(); // One-time fix for missing May 26th tasks
                 isFirstLoad = false;
             }
 
@@ -3330,78 +3329,6 @@ async function runBackfillJan31() {
     if (modifications > 0) {
         await saveData();
         alert(`Backfilled ${modifications} tasks for Jan 31st. +Coins added!`);
-    }
-
-    localStorage.setItem(FIX_ID, 'true');
-}
-
-// One-time backfill for May 26th 2026 missing tasks
-async function runBackfillMay26() {
-    const FIX_ID = 'backfill_may26_v1';
-    if (localStorage.getItem(FIX_ID)) return;
-
-    console.log('Running backfill for May 26th...');
-
-    // Date: May 26th 2026 (8:00 AM local time, which is after 6:00 AM reset)
-    const backfillDate = new Date('2026-05-26T08:00:00');
-    const backfillDateStr = getDateString(backfillDate);
-
-    let modifications = 0;
-    const tasksToFind = [
-        { title: 'Piano', exactId: false },
-        { title: 'Night Drops', exactId: false }
-    ];
-
-    tasksToFind.forEach(target => {
-        // Find the task
-        const task = appData.recurringTasks.find(t => t.title && t.title.toLowerCase().includes(target.title.toLowerCase()));
-
-        if (task) {
-            // Check if already completed on that day
-            const alreadyDone = appData.completedHistory.some(h => {
-                if (!h.completedAt) return false;
-                const d = new Date(h.completedAt);
-                if (d.getHours() < getResetHourForTimestamp(d)) d.setDate(d.getDate() - 1);
-                return getDateString(d) === backfillDateStr && h.recurringId === task.id;
-            });
-
-            if (!alreadyDone) {
-                const diff = DIFFICULTIES[task.difficulty] || DIFFICULTIES['medium'];
-
-                // Add to history
-                appData.completedHistory.push({
-                    id: Date.now() + Math.random().toString(), // unique ID
-                    title: task.title,
-                    difficulty: task.difficulty,
-                    coins: diff.coins,
-                    completedAt: backfillDate.toISOString(),
-                    isRecurring: true,
-                    recurringId: task.id
-                });
-
-                // Add coins
-                appData.stats.totalCoinsEarned += diff.coins;
-                appData.stats.currentBalance += diff.coins;
-
-                // Update stats
-                const diffKey = `tasksCompleted${task.difficulty.charAt(0).toUpperCase() + task.difficulty.slice(1)}`;
-                if (appData.stats[diffKey] !== undefined) {
-                    appData.stats[diffKey]++;
-                }
-
-                modifications++;
-                console.log(`Backfilled: ${task.title}`);
-            } else {
-                console.log(`Skipped (already done): ${task.title}`);
-            }
-        } else {
-            console.log(`Task not found: ${target.title}`);
-        }
-    });
-
-    if (modifications > 0) {
-        await saveData();
-        alert(`Backfilled ${modifications} tasks for May 26th. +Coins added!`);
     }
 
     localStorage.setItem(FIX_ID, 'true');
