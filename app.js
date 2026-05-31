@@ -1,4 +1,4 @@
-import { db, doc, onSnapshot, setDoc, getDoc } from "./firebase-config.js";
+import { db, doc, onSnapshot, setDoc, getDoc, updateDoc, arrayUnion, collection, getDocs, writeBatch } from "./firebase-config.js";
 
 let DATA_DOC_REF = null; // Set dynamically based on secret key
 let SECRET_KEY = localStorage.getItem('brownbook_secret_key');
@@ -173,7 +173,7 @@ async function init() {
     console.log("Using Secret Key:", SECRET_KEY);
 
     // Listen for real-time updates from Cloud Firestore
-    onSnapshot(DATA_DOC_REF, (doc) => {
+    onSnapshot(DATA_DOC_REF, async (doc) => {
         if (doc.exists()) {
             const data = doc.data();
             appData = { ...appData, ...data }; // Merge with defaults
@@ -198,6 +198,8 @@ async function init() {
             if (isFirstLoad) {
                 runMigrationsAndCleanup();
                 runBackfillJan31(); // One-time fix for missing Jan 31st tasks
+                await migrateHistoryToSubcollection();
+                await loadHistoryMonths();
                 isFirstLoad = false;
             }
 
@@ -339,6 +341,7 @@ async function runMigrationsAndCleanup() {
                 // It is today's record. Is it marked completed in state?
                 if (!appData.recurringCompletions[h.recurringId]) {
                     // It is NOT in completions map. It's a zombie. Kill it.
+                    markMonthDirty(h.completedAt);
                     return false;
                 }
             }
@@ -391,21 +394,101 @@ async function runMigrationsAndCleanup() {
     }
 }
 
-// Save data to Cloud Firestore
-async function saveData() {
-    try {
-        await setDoc(DATA_DOC_REF, appData);
-        // Sync indicator flash
-        const syncStatus = document.getElementById('syncStatus');
-        if (syncStatus) {
-            syncStatus.style.opacity = '1';
-            setTimeout(() => syncStatus.style.opacity = '0.5', 500);
+let syncTimeout = null;
+let syncPromise = null;
+let syncResolve = null;
+let dirtyMonths = new Set();
+
+function markMonthDirty(dateString) {
+    if (!dateString) return;
+    const d = new Date(dateString);
+    const monthKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    dirtyMonths.add(monthKey);
+}
+
+// Save data to Cloud Firestore (debounced 500ms)
+function saveData() {
+    if (!syncPromise) {
+        syncPromise = new Promise(resolve => {
+            syncResolve = resolve;
+        });
+    }
+
+    if (syncTimeout) clearTimeout(syncTimeout);
+    
+    syncTimeout = setTimeout(async () => {
+        try {
+            // Send everything EXCEPT completedHistory to the main document
+            const { completedHistory, ...dataToSave } = appData;
+            await updateDoc(DATA_DOC_REF, dataToSave);
+            
+            // Sync dirty months
+            if (dirtyMonths.size > 0) {
+                const batch = writeBatch(db);
+                for (const monthKey of dirtyMonths) {
+                    const monthRef = doc(db, 'users', SECRET_KEY, 'history_months', `history_${monthKey}`);
+                    const monthTasks = appData.completedHistory.filter(t => {
+                        if (!t.completedAt) return false;
+                        const d = new Date(t.completedAt);
+                        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` === monthKey;
+                    });
+                    batch.set(monthRef, { entries: monthTasks }, { merge: true });
+                }
+                await batch.commit();
+                dirtyMonths.clear();
+            }
+
+            // Sync indicator flash
+            const syncStatus = document.getElementById('syncStatus');
+            if (syncStatus) {
+                syncStatus.style.opacity = '1';
+                setTimeout(() => syncStatus.style.opacity = '0.5', 500);
+            }
+        } catch (e) {
+            console.error("Error saving to cloud:", e);
+        } finally {
+            if (syncResolve) syncResolve();
+            syncPromise = null;
+            syncResolve = null;
         }
-    } catch (e) {
-        console.error("Error saving to cloud:", e);
-        alert("Sync error! Check your connection.");
+    }, 500);
+
+    return syncPromise;
+}
+
+// Flush pending saves immediately when app closes
+async function flushPendingSaves() {
+    if (syncTimeout) {
+        clearTimeout(syncTimeout);
+        syncTimeout = null;
+        
+        try {
+            const { completedHistory, ...dataToSave } = appData;
+            updateDoc(DATA_DOC_REF, dataToSave);
+            
+            if (dirtyMonths.size > 0) {
+                const batch = writeBatch(db);
+                for (const monthKey of dirtyMonths) {
+                    const monthRef = doc(db, 'users', SECRET_KEY, 'history_months', `history_${monthKey}`);
+                    const monthTasks = appData.completedHistory.filter(t => {
+                        if (!t.completedAt) return false;
+                        const d = new Date(t.completedAt);
+                        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` === monthKey;
+                    });
+                    batch.set(monthRef, { entries: monthTasks }, { merge: true });
+                }
+                batch.commit();
+                dirtyMonths.clear();
+            }
+        } catch (e) {
+            console.error("Error flushing saves:", e);
+        }
     }
 }
+
+window.addEventListener('beforeunload', () => {
+    flushPendingSaves();
+});
 
 // Event Listeners
 // Toggle Subtask
@@ -496,6 +579,7 @@ async function toggleSubtask(event, parentId, subtaskId, type) {
                 const diffKey = `tasksCompleted${entry.difficulty.charAt(0).toUpperCase() + entry.difficulty.slice(1)}`;
                 if (appData.stats[diffKey] > 0) appData.stats[diffKey]--;
                 appData.completedHistory.splice(historyIndex, 1);
+                markMonthDirty(entry.completedAt);
             }
             // Need full re-render when main task state changes
             await saveData();
@@ -1772,6 +1856,7 @@ function toggleTask(id) {
 
     // Move to completed history
     appData.completedHistory.unshift(task);
+    markMonthDirty(task.completedAt);
     appData.tasks.splice(taskIndex, 1);
 
     // Show coin animation
@@ -1798,10 +1883,12 @@ function uncompleteTask(id) {
     decrementTaskCount(task.difficulty);
 
     // Mark as not completed and move back to tasks
+    const completedAtCache = task.completedAt;
     task.completed = false;
     delete task.completedAt;
     appData.tasks.unshift(task);
     appData.completedHistory.splice(taskIndex, 1);
+    markMonthDirty(completedAtCache);
 
     saveData();
     renderTasks();
@@ -1841,7 +1928,9 @@ function toggleRecurringTask(id) {
         });
 
         if (historyIndex !== -1) {
+            const removedTask = appData.completedHistory[historyIndex];
             appData.completedHistory.splice(historyIndex, 1);
+            markMonthDirty(removedTask.completedAt);
         }
     } else {
         // Complete - add coins and mark completion
@@ -1857,7 +1946,7 @@ function toggleRecurringTask(id) {
         }
 
         // Log to completedHistory for permanent record
-        appData.completedHistory.unshift({
+        const newTask = {
             id: 'recurring_' + id + '_' + Date.now(),
             recurringId: id,
             title: task.title,
@@ -1866,7 +1955,9 @@ function toggleRecurringTask(id) {
             isRecurring: true,
             completed: true,
             completedAt: new Date().toISOString()
-        });
+        };
+        appData.completedHistory.unshift(newTask);
+        markMonthDirty(newTask.completedAt);
 
         // Show coin animation
         showCoinPopup(id, coins);
@@ -3254,6 +3345,62 @@ function escapeHtml(text) {
 
 // Start the app
 init();
+
+// Load history from subcollections
+async function loadHistoryMonths() {
+    try {
+        const historyCol = collection(db, 'users', SECRET_KEY, 'history_months');
+        const snapshot = await getDocs(historyCol);
+        let allHistory = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.entries) allHistory.push(...data.entries);
+        });
+        
+        allHistory.sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
+        appData.completedHistory = allHistory;
+        
+        renderHistory();
+        renderProgress();
+    } catch (e) {
+        console.error("Error loading history from subcollection:", e);
+    }
+}
+
+// Migrate legacy history to subcollection
+async function migrateHistoryToSubcollection() {
+    if (appData.historyMigrated) return;
+    if (!appData.completedHistory || appData.completedHistory.length === 0) {
+        await updateDoc(DATA_DOC_REF, { historyMigrated: true });
+        appData.historyMigrated = true;
+        return;
+    }
+
+    console.log("Starting one-time migration of history to subcollections...");
+    
+    const grouped = {};
+    appData.completedHistory.forEach(task => {
+        const d = new Date(task.completedAt || Date.now());
+        const monthKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        if (!grouped[monthKey]) grouped[monthKey] = [];
+        grouped[monthKey].push(task);
+    });
+    
+    try {
+        const batch = writeBatch(db);
+        for (const [monthKey, tasks] of Object.entries(grouped)) {
+            const monthRef = doc(db, 'users', SECRET_KEY, 'history_months', `history_${monthKey}`);
+            batch.set(monthRef, { entries: tasks }, { merge: true });
+        }
+        batch.update(DATA_DOC_REF, { historyMigrated: true });
+        
+        await batch.commit();
+        appData.historyMigrated = true;
+        console.log("Migration complete!");
+    } catch (e) {
+        console.error("Migration failed:", e);
+    }
+}
 
 // One-time backfill for Jan 31st 2026 missing tasks
 async function runBackfillJan31() {
