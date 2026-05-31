@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, initializeFirestore, persistentLocalCache, doc, onSnapshot, setDoc, getDoc, updateDoc, arrayUnion, collection, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, doc, onSnapshot, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBM0DZHR1EimSQ7ryKuteskO7-jSqw2BKk",
@@ -12,12 +12,8 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-
-// Initialize Firestore with offline persistence enabled
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache()
-});
+const db = getFirestore(app);
 
 // Data Reference is now managed dynamically in app.js based on localStorage ID
 
-export { db, doc, onSnapshot, setDoc, getDoc, updateDoc, arrayUnion, collection, getDocs, writeBatch };
+export { db, doc, onSnapshot, setDoc, getDoc };
