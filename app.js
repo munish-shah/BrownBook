@@ -2896,6 +2896,7 @@ function isTaskActiveOnDate(task, date) {
     // Task didn't exist yet on this date
     if (task.createdAt) {
         const createdDate = new Date(task.createdAt);
+        if (createdDate.getHours() < getResetHourForTimestamp(createdDate)) createdDate.setDate(createdDate.getDate() - 1);
         createdDate.setHours(0, 0, 0, 0);
         if (checkDate < createdDate) {
             return false;
@@ -2905,6 +2906,7 @@ function isTaskActiveOnDate(task, date) {
     // Task was soft-deleted: not active on or after deletion date
     if (task.deletedAt) {
         const deletedDate = new Date(task.deletedAt);
+        if (deletedDate.getHours() < getResetHourForTimestamp(deletedDate)) deletedDate.setDate(deletedDate.getDate() - 1);
         deletedDate.setHours(0, 0, 0, 0);
         if (checkDate >= deletedDate) {
             return false;
