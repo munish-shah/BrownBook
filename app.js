@@ -2092,7 +2092,7 @@ function isWeekendSale() {
     const now = new Date();
     
     // Summer vacation sale: full time everyday until June 1st, 2026
-    if (now < new Date('2026-06-01T00:00:00')) return true;
+    if (now < new Date('2026-07-01T00:00:00')) return true;
 
     const day = now.getDay(); // 0=Sun, 6=Sat
     const hour = now.getHours();
