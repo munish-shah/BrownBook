@@ -203,6 +203,11 @@
                                 class="icon icon-green"></i> TODAY'S COMPLETED</h2>
                         <div class="task-list" id="todayCompletedTaskList"></div>
                     </section>
+
+                    <details class="suspended-tasks-section" id="suspendedTasksSection" style="display: none;">
+                        <summary><i data-lucide="pause-circle" class="icon icon-gray"></i> Suspended Tasks (<span id="suspendedCount">0</span>)</summary>
+                        <div class="task-list" id="suspendedTaskList"></div>
+                    </details>
                 </div>
             </div>
 
@@ -638,6 +643,46 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="cancelKeyChange">Cancel</button>
                 <button class="btn btn-primary" id="saveKeyChange">Load/Sync Key</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="suspendTaskModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Suspend Task <i data-lucide="pause-circle" class="icon icon-teal" style="width:18px;height:18px;"></i></h2>
+                <button class="modal-close" id="closeSuspendModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 12px; color: #ccc;">How long would you like to suspend this task?</p>
+                
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <label class="radio-label">
+                        <input type="radio" name="suspendType" value="days" checked>
+                        <span>Number of days</span>
+                    </label>
+                    <div id="suspendDaysContainer" style="margin-left: 28px; display: flex; align-items: center; gap: 8px;">
+                        <input type="number" id="suspendDaysInput" value="7" min="1" style="width: 80px; padding: 8px; border-radius: 4px; background: #2a2a2a; color: white; border: 1px solid #444;">
+                        <span>days</span>
+                    </div>
+
+                    <label class="radio-label">
+                        <input type="radio" name="suspendType" value="date">
+                        <span>Until specific date</span>
+                    </label>
+                    <div id="suspendDateContainer" style="margin-left: 28px; display: none;">
+                        <input type="date" id="suspendDateInput" style="padding: 8px; border-radius: 4px; background: #2a2a2a; color: white; border: 1px solid #444;">
+                    </div>
+
+                    <label class="radio-label">
+                        <input type="radio" name="suspendType" value="indefinite">
+                        <span>Indefinitely</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelSuspend">Cancel</button>
+                <button class="btn btn-primary" id="confirmSuspend">Suspend</button>
             </div>
         </div>
     </div>

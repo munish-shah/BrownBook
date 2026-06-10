@@ -11,6 +11,7 @@ if (!SECRET_KEY) {
 
 // Set reference immediately
 DATA_DOC_REF = doc(db, "users", SECRET_KEY);
+let currentSuspendTaskId = null;
 
 // Difficulty configurations
 const DIFFICULTIES = {
@@ -657,7 +658,17 @@ function setupEventListeners() {
     document.getElementById('closeTaskModal').addEventListener('click', closeAddTaskModal);
     document.getElementById('cancelTask').addEventListener('click', closeAddTaskModal);
     document.getElementById('saveTask').addEventListener('click', saveNewTask);
-
+    // Suspend Modal Events
+    document.getElementById('closeSuspendModal').addEventListener('click', closeSuspendModal);
+    document.getElementById('cancelSuspend').addEventListener('click', closeSuspendModal);
+    document.getElementById('confirmSuspend').addEventListener('click', handleSuspendConfirm);
+    
+    document.querySelectorAll('input[name="suspendType"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            document.getElementById('suspendDaysContainer').style.display = e.target.value === 'days' ? 'flex' : 'none';
+            document.getElementById('suspendDateContainer').style.display = e.target.value === 'date' ? 'block' : 'none';
+        });
+    });
     // Import Data Flow
     document.getElementById('importDataBtn').addEventListener('click', () => {
         document.getElementById('importModal').classList.add('open');
@@ -1146,8 +1157,15 @@ function renderTasks() {
         return completedDate >= todayStart;
     });
 
-    // Filter recurring tasks - only show interval tasks on active days
-    const visibleRecurringTasks = appData.recurringTasks.filter(t => !t.deleted && shouldShowIntervalTask(t));
+    // Filter recurring tasks - only show those active today (handles interval logic and suspensions)
+    const now = new Date();
+    if (now.getHours() < getCurrentResetHour()) {
+        now.setDate(now.getDate() - 1);
+    }
+    
+    // Split into active, completed, and suspended
+    const suspendedTasks = appData.recurringTasks.filter(t => !t.deleted && isTaskSuspendedOnDate(t, now));
+    const visibleRecurringTasks = appData.recurringTasks.filter(t => !t.deleted && !isTaskSuspendedOnDate(t, now) && isTaskActiveOnDate(t, now));
 
     // Separate visible recurring tasks into completed and not completed for today
     const recurringNotCompleted = visibleRecurringTasks.filter(t => !isRecurringCompletedToday(t.id));
@@ -1170,12 +1188,34 @@ function renderTasks() {
     const hasRecurring = recurringNotCompleted.length > 0;
     const hasActive = activeTasks.length > 0;
     const hasTodayCompleted = todayCompletedTasks.length > 0 || recurringCompleted.length > 0;
-    const isEmpty = !hasRecurring && !hasActive && !hasTodayCompleted;
+    const hasSuspended = suspendedTasks.length > 0;
+    const isEmpty = !hasRecurring && !hasActive && !hasTodayCompleted && !hasSuspended;
 
     document.getElementById('tasksEmpty').style.display = isEmpty ? 'block' : 'none';
     document.getElementById('recurringTasks').style.display = hasRecurring ? 'block' : 'none';
     document.getElementById('activeTasks').style.display = hasActive ? 'block' : 'none';
     document.getElementById('todayCompletedTasks').style.display = hasTodayCompleted ? 'block' : 'none';
+    document.getElementById('suspendedTasksSection').style.display = hasSuspended ? 'block' : 'none';
+
+    // Render suspended tasks
+    if (hasSuspended) {
+        document.getElementById('suspendedCount').textContent = suspendedTasks.length;
+        document.getElementById('suspendedTaskList').innerHTML = suspendedTasks.map(task => {
+            const diff = DIFFICULTIES[task.difficulty || 'medium'];
+            return `
+                <div class="task-row recurring-row" data-id="${task.id}" data-type="recurring">
+                    <div class="task-checkbox recurring ${task.difficulty}">
+                        <i data-lucide="pause-circle" class="icon icon-gray" style="width:14px;height:14px;"></i>
+                    </div>
+                    <div class="task-content">
+                        <div class="task-title" style="color: #888;">${escapeHtml(task.title)}</div>
+                    </div>
+                    <button class="btn-resume" onclick="unsuspendTask('${task.id}')">Resume</button>
+                </div>
+            `;
+        }).join('');
+        lucide.createIcons();
+    }
 
     // ============= FOCUS SECTION =============
     // Ensure focusPinnedIds exists
@@ -1270,6 +1310,10 @@ function renderTasks() {
 
     document.querySelectorAll('.recurring-delete').forEach(btn => {
         btn.addEventListener('click', () => deleteRecurringTask(btn.dataset.id));
+    });
+
+    document.querySelectorAll('.recurring-suspend').forEach(btn => {
+        btn.addEventListener('click', () => openSuspendModal(btn.dataset.id));
     });
 
     // Pin button listeners
@@ -1574,6 +1618,7 @@ function createRecurringTaskRow(task, isCompleted, inFocusSection = false) {
                     ${diff.emoji} ${diff.coins}
                 </div>
                 ${pinBtn}
+                <button class="recurring-suspend" data-id="${task.id}"><i data-lucide="pause-circle" class="icon icon-teal"></i></button>
                 <button class="recurring-delete" data-id="${task.id}"><i data-lucide="trash-2" class="icon icon-red"></i></button>
             </div>
             ${subtasksHtml}
@@ -1895,6 +1940,74 @@ async function deleteRecurringTask(id) {
     if (appData.focusPinnedIds) {
         appData.focusPinnedIds = appData.focusPinnedIds.filter(pid => pid !== id);
     }
+    saveData();
+    renderTasks();
+}
+
+function openSuspendModal(taskId) {
+    currentSuspendTaskId = taskId;
+    document.getElementById('suspendTaskModal').classList.add('open');
+    document.getElementById('suspendDaysInput').value = '7';
+    document.getElementById('suspendDateInput').value = '';
+    document.querySelector('input[name="suspendType"][value="days"]').checked = true;
+    document.getElementById('suspendDaysContainer').style.display = 'flex';
+    document.getElementById('suspendDateContainer').style.display = 'none';
+}
+
+function closeSuspendModal() {
+    document.getElementById('suspendTaskModal').classList.remove('open');
+    currentSuspendTaskId = null;
+}
+
+function handleSuspendConfirm() {
+    if (!currentSuspendTaskId) return;
+    
+    const type = document.querySelector('input[name="suspendType"]:checked').value;
+    let endDate = null;
+    
+    if (type === 'days') {
+        const days = parseInt(document.getElementById('suspendDaysInput').value) || 0;
+        if (days > 0) {
+            const date = new Date();
+            date.setDate(date.getDate() + days);
+            endDate = date.toISOString();
+        }
+    } else if (type === 'date') {
+        const dateVal = document.getElementById('suspendDateInput').value;
+        if (dateVal) {
+            const date = new Date(dateVal);
+            date.setHours(23, 59, 59, 999);
+            endDate = date.toISOString();
+        }
+    }
+    
+    suspendTask(currentSuspendTaskId, endDate);
+    closeSuspendModal();
+}
+
+function suspendTask(id, endDate) {
+    const task = appData.recurringTasks.find(t => t.id === id);
+    if (!task) return;
+    
+    if (!task.suspensions) task.suspensions = [];
+    task.suspensions.push({
+        start: new Date().toISOString(),
+        end: endDate // null means indefinite
+    });
+    
+    saveData();
+    renderTasks();
+}
+
+window.unsuspendTask = function(id) {
+    const task = appData.recurringTasks.find(t => t.id === id);
+    if (!task || !task.suspensions || task.suspensions.length === 0) return;
+    
+    const lastSuspension = task.suspensions[task.suspensions.length - 1];
+    if (!lastSuspension.end || new Date(lastSuspension.end) > new Date()) {
+        lastSuspension.end = new Date().toISOString();
+    }
+    
     saveData();
     renderTasks();
 }
@@ -2888,6 +3001,30 @@ function getFirstUseDate() {
     return earliest || new Date();
 }
 
+// Check if a task is explicitly suspended on a given date
+function isTaskSuspendedOnDate(task, date) {
+    if (!task.suspensions || task.suspensions.length === 0) return false;
+    
+    const checkDate = new Date(date);
+    checkDate.setHours(0, 0, 0, 0);
+
+    for (const sus of task.suspensions) {
+        const start = new Date(sus.start);
+        start.setHours(0, 0, 0, 0);
+        
+        let end = null;
+        if (sus.end) {
+            end = new Date(sus.end);
+            end.setHours(23, 59, 59, 999);
+        }
+        
+        if (checkDate >= start && (!end || checkDate <= end)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Check if a recurring task was scheduled to be active on a given date
 function isTaskActiveOnDate(task, date) {
     const checkDate = new Date(date);
@@ -2911,6 +3048,11 @@ function isTaskActiveOnDate(task, date) {
         if (checkDate >= deletedDate) {
             return false;
         }
+    }
+
+    // Task is suspended: not active during suspension period
+    if (isTaskSuspendedOnDate(task, checkDate)) {
+        return false;
     }
 
     // Daily tasks are always active (if they existed)

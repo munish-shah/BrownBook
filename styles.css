@@ -1970,7 +1970,8 @@ input[type="range"]::-webkit-slider-thumb {
     font-size: 16px;
 }
 
-.recurring-delete {
+.recurring-delete,
+.recurring-suspend {
     padding: 4px 8px;
     border: none;
     background: transparent;
@@ -1981,12 +1982,62 @@ input[type="range"]::-webkit-slider-thumb {
     font-size: 14px;
 }
 
-.task-row:hover .recurring-delete {
+.task-row:hover .recurring-delete,
+.task-row:hover .recurring-suspend {
     opacity: 1;
 }
 
 .recurring-delete:hover {
     color: var(--diff-epic);
+}
+
+.recurring-suspend:hover {
+    color: var(--task-teal);
+}
+
+/* Suspended Tasks Section */
+.suspended-tasks-section {
+    margin-top: 30px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+}
+
+.suspended-tasks-section summary {
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    user-select: none;
+    margin-bottom: 15px;
+    opacity: 0.8;
+}
+
+.suspended-tasks-section summary:hover {
+    color: var(--text-primary);
+    opacity: 1;
+}
+
+.btn-resume {
+    background-color: var(--surface-light);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+}
+
+.btn-resume:hover {
+    background-color: rgba(68, 204, 170, 0.1);
+    border-color: var(--task-teal);
+    color: var(--task-teal);
 }
 
 /* Completed Header Style */
