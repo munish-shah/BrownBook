@@ -72,7 +72,16 @@ let appData = {
 
 let currentRewardToClaim = null;
 let currentShopItemToClaim = null;
+let currentTimerDurationToStart = 0;
 let isFirstLoad = true;
+
+// Reward Timer State
+let rewardTimerInterval = null;
+let rewardTimerEndTime = null;
+let rewardTimerRemaining = 0;
+let isRewardTimerPaused = false;
+let audioContext = null;
+let beepInterval = null;
 
 // ========== Reset Time Configuration ==========
 // To change the reset time: add a new entry with the date it takes effect.
@@ -2584,6 +2593,30 @@ function saveNewReward() {
     closeAddRewardModal();
 }
 
+function setupClaimModal(name, cost) {
+    document.getElementById('claimMessage').textContent =
+        `Spend ${cost} coins on "${name}"?\n\nGo enjoy your reward! 🎉`;
+        
+    const duration = parseDuration(name);
+    currentTimerDurationToStart = duration;
+    
+    const timerOpt = document.getElementById('timerOptionContainer');
+    const timerLabel = document.getElementById('startTimerLabelText');
+    const timerCheckbox = document.getElementById('startTimerCheckbox');
+    
+    if (duration > 0) {
+        const mins = Math.round(duration / 60000);
+        timerLabel.textContent = `Start a ${mins} minute timer?`;
+        timerCheckbox.checked = true;
+        timerOpt.style.display = 'block';
+    } else {
+        timerOpt.style.display = 'none';
+        timerCheckbox.checked = false;
+    }
+    
+    document.getElementById('claimModal').classList.add('open');
+}
+
 // Shop item claim modal
 function openShopClaimModal(itemId) {
     // Find in both preset and custom shop items
@@ -2595,10 +2628,9 @@ function openShopClaimModal(itemId) {
 
     const currentPrice = getShopItemPrice(item);
     currentShopItemToClaim = { item, price: currentPrice };
+    currentRewardToClaim = null;
 
-    document.getElementById('claimMessage').textContent =
-        `Spend ${currentPrice} coins on "${item.name}"?\n\nGo enjoy your reward! 🎉`;
-    document.getElementById('claimModal').classList.add('open');
+    setupClaimModal(item.name, currentPrice);
 }
 
 // Delete shop item (works for both custom and preset items)
@@ -2627,9 +2659,8 @@ function openClaimModal(id) {
 
     currentRewardToClaim = reward;
     currentShopItemToClaim = null;
-    document.getElementById('claimMessage').textContent =
-        `Spend ${reward.cost} coins on "${reward.name}"?\n\nGo enjoy your reward! 🎉`;
-    document.getElementById('claimModal').classList.add('open');
+    
+    setupClaimModal(reward.name, reward.cost);
 }
 
 function closeClaimModal() {
@@ -2659,6 +2690,10 @@ function confirmClaimReward() {
             appData.shopPurchases[item.id].count++;
         }
 
+        if (currentTimerDurationToStart > 0 && document.getElementById('startTimerCheckbox').checked) {
+            startRewardTimer(currentTimerDurationToStart);
+        }
+
         saveData();
         renderRewards();
         updateCoinDisplay();
@@ -2672,6 +2707,10 @@ function confirmClaimReward() {
         appData.stats.rewardsClaimed++;
         currentRewardToClaim.timesClaimed++;
         currentRewardToClaim.lastClaimedAt = new Date().toISOString();
+
+        if (currentTimerDurationToStart > 0 && document.getElementById('startTimerCheckbox').checked) {
+            startRewardTimer(currentTimerDurationToStart);
+        }
 
         saveData();
         renderRewards();
@@ -3481,3 +3520,194 @@ async function runBackfillJan31() {
 // Expose subtask functions globally for inline onclick handlers
 window.toggleSubtasks = toggleSubtasks;
 window.toggleSubtask = toggleSubtask;
+
+// ==================== REWARD TIMER LOGIC ====================
+
+function parseDuration(title) {
+    if (!title) return 0;
+    const match = title.match(/(\d+)\s*(min|minute|m|hour|hr|h)s?\b/i);
+    if (!match) return 0;
+    
+    const value = parseInt(match[1]);
+    const unit = match[2].toLowerCase();
+    
+    if (unit.startsWith('h')) {
+        return value * 60 * 60 * 1000;
+    } else {
+        return value * 60 * 1000;
+    }
+}
+
+function initRewardTimer() {
+    const savedState = localStorage.getItem('brownbookRewardTimer');
+    if (savedState) {
+        try {
+            const state = JSON.parse(savedState);
+            if (state.isRunning || state.isPaused) {
+                rewardTimerRemaining = state.remaining;
+                isRewardTimerPaused = state.isPaused;
+                if (!isRewardTimerPaused) {
+                    const elapsed = Date.now() - state.lastUpdated;
+                    rewardTimerRemaining -= elapsed;
+                }
+                
+                if (rewardTimerRemaining > 0) {
+                    resumeRewardTimerCore(false); // false means don't play sound yet
+                } else {
+                    rewardTimerRemaining = 0;
+                    startRinging();
+                }
+            }
+        } catch (e) {
+            console.error('Failed to parse timer state', e);
+        }
+    }
+    
+    document.getElementById('timerPlayPauseBtn').addEventListener('click', () => {
+        if (isRewardTimerPaused || document.getElementById('floatingTimer').classList.contains('ringing')) {
+            // If it was ringing, pause stops the ringing but doesn't resume timer if at 0
+            if (rewardTimerRemaining <= 0) {
+                stopRewardTimer();
+            } else {
+                resumeRewardTimerCore(true);
+            }
+        }
+        else pauseRewardTimer();
+    });
+    
+    document.getElementById('timerStopBtn').addEventListener('click', stopRewardTimer);
+}
+
+function startRewardTimer(durationMs) {
+    stopRewardTimer();
+    rewardTimerRemaining = durationMs;
+    isRewardTimerPaused = false;
+    resumeRewardTimerCore(true);
+}
+
+function resumeRewardTimerCore(updateState = true) {
+    isRewardTimerPaused = false;
+    document.getElementById('floatingTimer').style.display = 'flex';
+    document.getElementById('timerPlayPauseBtn').innerHTML = '<i data-lucide="pause" class="icon" style="width: 16px; height: 16px;"></i>';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    
+    rewardTimerEndTime = Date.now() + rewardTimerRemaining;
+    
+    if (rewardTimerInterval) clearInterval(rewardTimerInterval);
+    rewardTimerInterval = setInterval(timerTick, 1000);
+    timerTick();
+    if (updateState) saveTimerState();
+}
+
+function pauseRewardTimer() {
+    isRewardTimerPaused = true;
+    if (rewardTimerInterval) clearInterval(rewardTimerInterval);
+    
+    document.getElementById('timerPlayPauseBtn').innerHTML = '<i data-lucide="play" class="icon" style="width: 16px; height: 16px; fill: currentColor;"></i>';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    
+    saveTimerState();
+}
+
+function stopRewardTimer() {
+    if (rewardTimerInterval) clearInterval(rewardTimerInterval);
+    if (beepInterval) clearInterval(beepInterval);
+    
+    rewardTimerInterval = null;
+    beepInterval = null;
+    isRewardTimerPaused = false;
+    rewardTimerRemaining = 0;
+    
+    const container = document.getElementById('floatingTimer');
+    container.style.display = 'none';
+    container.classList.remove('ringing');
+    
+    localStorage.removeItem('brownbookRewardTimer');
+}
+
+function timerTick() {
+    if (isRewardTimerPaused) return;
+    
+    rewardTimerRemaining = rewardTimerEndTime - Date.now();
+    
+    if (rewardTimerRemaining <= 0) {
+        rewardTimerRemaining = 0;
+        if (rewardTimerInterval) clearInterval(rewardTimerInterval);
+        startRinging();
+    }
+    
+    updateTimerDisplay();
+    saveTimerState();
+}
+
+function updateTimerDisplay() {
+    const totalSeconds = Math.ceil(rewardTimerRemaining / 1000);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    document.getElementById('timerDisplay').textContent = 
+        `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+function saveTimerState() {
+    if (rewardTimerRemaining <= 0 && !document.getElementById('floatingTimer').classList.contains('ringing')) {
+        localStorage.removeItem('brownbookRewardTimer');
+        return;
+    }
+    
+    localStorage.setItem('brownbookRewardTimer', JSON.stringify({
+        remaining: rewardTimerRemaining,
+        isPaused: isRewardTimerPaused,
+        isRunning: rewardTimerRemaining > 0,
+        lastUpdated: Date.now()
+    }));
+}
+
+function startRinging() {
+    updateTimerDisplay();
+    const container = document.getElementById('floatingTimer');
+    container.style.display = 'flex';
+    container.classList.add('ringing');
+    
+    // Change pause button to a "stop/dismiss" icon, but we already have a stop button.
+    // Let's just make play/pause into a play icon so they know it's stopped.
+    document.getElementById('timerPlayPauseBtn').innerHTML = '<i data-lucide="play" class="icon" style="width: 16px; height: 16px; fill: currentColor;"></i>';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    
+    if (beepInterval) clearInterval(beepInterval);
+    playBeepSound(); // Play first beep immediately
+    beepInterval = setInterval(playBeepSound, 1000); // Beep every second
+}
+
+function playBeepSound() {
+    try {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        
+        // Resume if suspended (browser policy)
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5 note
+
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.5, audioContext.currentTime + 0.05);
+        gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.3);
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.3);
+    } catch (e) {
+        console.error("Audio beep failed", e);
+    }
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', initRewardTimer);
