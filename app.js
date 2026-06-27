@@ -3696,7 +3696,7 @@ function playBeepSound() {
         oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5 note
 
         gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-        gainNode.gain.linearRampToValueAtTime(0.5, audioContext.currentTime + 0.05);
+        gainNode.gain.linearRampToValueAtTime(1.0, audioContext.currentTime + 0.05);
         gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.3);
 
         oscillator.connect(gainNode);
