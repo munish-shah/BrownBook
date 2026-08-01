@@ -14,6 +14,10 @@ dist/
 out/
 build/
 
+# The BrownBook Coast plugin is self-contained after its server is bundled.
+!plugins/brownbook-coast/dist/
+!plugins/brownbook-coast/dist/server.mjs
+
 # Local Environment & Secrets
 .env
 .env.local

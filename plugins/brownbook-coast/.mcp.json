@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "brownbook": {
+      "command": "node",
+      "args": ["./dist/server.mjs"],
+      "cwd": "."
+    }
+  }
+}

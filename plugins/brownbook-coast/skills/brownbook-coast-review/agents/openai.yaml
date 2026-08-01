@@ -1,0 +1,4 @@
+interface:
+  display_name: "BrownBook Coast Review"
+  short_description: "Compare tasks with Coast activity"
+  default_prompt: "Use $brownbook-coast-review to compare my BrownBook tasks with today’s Coast activity."

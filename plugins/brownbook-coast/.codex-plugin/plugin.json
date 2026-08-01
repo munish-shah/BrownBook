@@ -1,0 +1,27 @@
+{
+  "name": "brownbook-coast",
+  "version": "0.1.0",
+  "description": "Read BrownBook task data in Codex and compare it with local Coast activity.",
+  "author": {
+    "name": "Munish Shah",
+    "url": "https://github.com/munish-shah"
+  },
+  "repository": "https://github.com/munish-shah/BrownBook",
+  "license": "MIT",
+  "keywords": ["brownbook", "tasks", "productivity", "coast"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "BrownBook Coast",
+    "shortDescription": "Compare BrownBook tasks with Coast activity.",
+    "longDescription": "Read your current BrownBook tasks and completion history, then use Coast as evidence of what was on screen.",
+    "developerName": "Munish Shah",
+    "category": "Productivity",
+    "capabilities": ["Read"],
+    "defaultPrompt": [
+      "Compare my BrownBook tasks for today with Coast activity.",
+      "What did I plan this week and what did Coast show me doing?",
+      "Show my remaining BrownBook tasks and help me prioritize them."
+    ]
+  },
+  "mcpServers": "./.mcp.json"
+}

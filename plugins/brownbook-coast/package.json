@@ -1,0 +1,18 @@
+{
+  "name": "brownbook-coast",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/server.mjs --bundle --platform=node --format=esm --target=node20 --outfile=dist/server.mjs",
+    "test": "node --test test/*.test.mjs",
+    "verify": "npm run build && npm test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.3"
+  }
+}
