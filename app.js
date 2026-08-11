@@ -52,7 +52,7 @@ let appData = {
     rewards: [],
     customShopItems: [],
     focusPinnedIds: [], // Ordered list of pinned task IDs for Focus section
-    vacationDays: ['2026-05-15', '2026-05-16', '2026-05-17'], // Dates treated as 100% (streak protected)
+    vacationDays: ['2026-05-15', '2026-05-16', '2026-05-17', '2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09'], // Dates treated as 100% (streak protected)
     stats: {
         totalCoinsEarned: 0,
         currentBalance: 0,
@@ -275,11 +275,16 @@ async function runMigrationsAndCleanup() {
     if (!appData.recurringCompletions) { appData.recurringCompletions = {}; needsSave = true; }
     if (!appData.completedHistory) { appData.completedHistory = []; needsSave = true; }
     if (!appData.vacationDays) { 
-        appData.vacationDays = ['2026-05-15', '2026-05-16', '2026-05-17']; 
+        appData.vacationDays = ['2026-05-15', '2026-05-16', '2026-05-17', '2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09']; 
         needsSave = true; 
-    } else if (!appData.vacationDays.includes('2026-05-17')) {
-        appData.vacationDays.push('2026-05-17');
-        needsSave = true;
+    } else {
+        const augVacDays = ['2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09'];
+        augVacDays.forEach(day => {
+            if (!appData.vacationDays.includes(day)) {
+                appData.vacationDays.push(day);
+                needsSave = true;
+            }
+        });
     }
 
     // Migrate completed tasks
@@ -2239,14 +2244,14 @@ function isWeekendSale() {
 
     const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-    // Check if today is a holiday (after reset hour)
-    if (holidays.includes(dateStr) && hour >= resetHour) return true;
+    // Check if today is a holiday or vacation day (after reset hour)
+    if ((holidays.includes(dateStr) || isVacationDay(dateStr)) && hour >= resetHour) return true;
 
-    // Check if yesterday was a holiday (before reset hour today)
+    // Check if yesterday was a holiday or vacation day (before reset hour today)
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
-    if (holidays.includes(yesterdayStr) && hour < resetHour) return true;
+    if ((holidays.includes(yesterdayStr) || isVacationDay(yesterdayStr)) && hour < resetHour) return true;
 
     return false;
 }
