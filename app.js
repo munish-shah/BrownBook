@@ -52,7 +52,7 @@ let appData = {
     rewards: [],
     customShopItems: [],
     focusPinnedIds: [], // Ordered list of pinned task IDs for Focus section
-    vacationDays: ['2026-05-15', '2026-05-16', '2026-05-17', '2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09'], // Dates treated as 100% (streak protected)
+    vacationDays: ['2026-05-15', '2026-05-16', '2026-05-17', '2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09', '2026-08-10'], // Dates treated as 100% (streak protected)
     stats: {
         totalCoinsEarned: 0,
         currentBalance: 0,
@@ -275,10 +275,10 @@ async function runMigrationsAndCleanup() {
     if (!appData.recurringCompletions) { appData.recurringCompletions = {}; needsSave = true; }
     if (!appData.completedHistory) { appData.completedHistory = []; needsSave = true; }
     if (!appData.vacationDays) { 
-        appData.vacationDays = ['2026-05-15', '2026-05-16', '2026-05-17', '2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09']; 
+        appData.vacationDays = ['2026-05-15', '2026-05-16', '2026-05-17', '2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09', '2026-08-10']; 
         needsSave = true; 
     } else {
-        const augVacDays = ['2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09'];
+        const augVacDays = ['2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09', '2026-08-10'];
         augVacDays.forEach(day => {
             if (!appData.vacationDays.includes(day)) {
                 appData.vacationDays.push(day);
