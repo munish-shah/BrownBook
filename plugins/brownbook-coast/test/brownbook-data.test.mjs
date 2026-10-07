@@ -11,6 +11,8 @@ import {
 import { loadBrownBookData } from "../src/server.mjs";
 
 const now = new Date(2026, 6, 31, 8, 0, 0);
+const localIso = (year, month, day, hour, minute = 0) => new Date(year, month, day, hour, minute, 0).toISOString();
+const intervalStart = new Date(2026, 6, 30, 6, 0, 0).toISOString();
 
 const fixture = {
   tasks: [
@@ -19,7 +21,7 @@ const fixture = {
       title: "Write report",
       notes: "BrownBook integration",
       difficulty: "hard",
-      createdAt: "2026-07-31T12:00:00.000Z",
+      createdAt: localIso(2026, 6, 31, 12),
       subtasks: [{ id: "sub-1", title: "Draft", completed: false }]
     }
   ],
@@ -30,7 +32,7 @@ const fixture = {
       notes: "Review priorities",
       difficulty: "easy",
       type: "daily",
-      createdAt: "2026-07-01T12:00:00.000Z"
+      createdAt: localIso(2026, 6, 1, 12)
     },
     {
       id: "interval-1",
@@ -39,8 +41,8 @@ const fixture = {
       type: "interval",
       activeDays: 2,
       breakDays: 1,
-      cycleStartDate: "2026-07-30T06:00:00.000Z",
-      createdAt: "2026-07-30T06:00:00.000Z"
+      cycleStartDate: intervalStart,
+      createdAt: intervalStart
     }
   ],
   recurringCompletions: { "daily-1": "2026-07-31" },
@@ -51,14 +53,14 @@ const fixture = {
       difficulty: "easy",
       isRecurring: true,
       recurringId: "daily-1",
-      completedAt: "2026-07-31T12:30:00.000Z"
+      completedAt: localIso(2026, 6, 31, 12, 30)
     },
     {
       id: "history-2",
       title: "Read attention article",
       notes: "Research",
       difficulty: "quick",
-      completedAt: "2026-07-30T16:00:00.000Z"
+      completedAt: localIso(2026, 6, 30, 16)
     }
   ],
   focusPinnedIds: ["task-1"],

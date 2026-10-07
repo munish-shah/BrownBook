@@ -4,86 +4,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Cache Control -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self' https://*.firebaseio.com https://*.googleapis.com https://*.firebasestorage.app https://cdn-icons-png.flaticon.com https://unpkg.com; script-src 'self' https://*.gstatic.com https://*.firebaseio.com https://*.googleapis.com https://unpkg.com 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://securetoken.googleapis.com;">
+        content="default-src 'self'; script-src 'self' https://*.gstatic.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://securetoken.googleapis.com; img-src 'self' data:; font-src 'self';">
     <title>BrownBook</title>
-    <link rel="stylesheet" href="styles.css?v=1.1.0">
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="styles.css?v=2.0.0">
+    <link rel="stylesheet" href="notebook.css?v=4.0.0">
+    <script src="assets/vendor/lucide.min.js" defer></script>
+    <script src="assets/vendor/motion.js" defer></script>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="theme-color" content="#1A1816">
 
-    <!-- Script to unregister lingering service workers -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function (registrations) {
-                for (let registration of registrations) {
-                    registration.unregister();
-                }
-            });
-        }
-    </script>
 </head>
 
 <body>
+    <div class="ambient-field" aria-hidden="true">
+        <span class="ambient-orb ambient-orb-a"></span>
+        <span class="ambient-orb ambient-orb-b"></span>
+        <span class="ambient-grid"></span>
+        <span class="ambient-noise"></span>
+    </div>
     <div class="app-container">
-        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-header">
                 <div class="app-logo">
-                    <span class="logo-icon"><i data-lucide="notebook-pen" class="icon icon-gold"
-                            style="width:22px;height:22px;"></i></span>
-                    <span class="app-name">BrownBook</span>
+                    <span class="logo-icon"><i data-lucide="notebook-pen" class="icon icon-gold"></i></span>
+                    <span class="brand-copy">
+                        <span class="app-name">BrownBook</span>
+                        <span class="app-tagline">Personal ledger</span>
+                    </span>
                 </div>
+                <button class="command-trigger" id="commandTrigger" type="button" aria-label="Open command palette">
+                    <i data-lucide="search" class="icon"></i>
+                    <span>Jump anywhere</span>
+                    <kbd>⌘ K</kbd>
+                </button>
                 <div class="coin-display" id="coinBalance">
                     <span class="coin-icon"><i data-lucide="circle-dollar-sign" class="icon icon-gold"></i></span>
-                    <span class="coin-amount">0</span>
+                    <span class="coin-copy"><span class="coin-amount">0</span><span class="coin-label">available</span></span>
                 </div>
-                <!-- Mobile Key Button Removed (Moved to Nav) -->
             </div>
 
-            <nav class="nav-tabs">
-                <button class="nav-tab active" data-tab="tasks">
+            <nav class="nav-tabs" aria-label="Main navigation" role="tablist">
+                <button class="nav-tab active" data-tab="tasks" role="tab" aria-selected="true">
                     <span class="tab-icon"><i data-lucide="circle-check-big" class="icon icon-green"></i></span>
                     <span class="tab-label">Tasks</span>
                 </button>
-                <button class="nav-tab" data-tab="rewards">
+                <button class="nav-tab" data-tab="rewards" role="tab" aria-selected="false">
                     <span class="tab-icon"><i data-lucide="gift" class="icon icon-pink"></i></span>
                     <span class="tab-label">Rewards</span>
                 </button>
-                <button class="nav-tab" data-tab="stats">
+                <button class="nav-tab" data-tab="stats" role="tab" aria-selected="false">
                     <span class="tab-icon"><i data-lucide="bar-chart-3" class="icon icon-blue"></i></span>
                     <span class="tab-label">Stats</span>
                 </button>
-                <button class="nav-tab" data-tab="progress">
+                <button class="nav-tab" data-tab="progress" role="tab" aria-selected="false">
                     <span class="tab-icon"><i data-lucide="chart-no-axes-combined" class="icon icon-orange"></i></span>
                     <span class="tab-label">Progress</span>
                 </button>
-                <button class="nav-tab" data-tab="history">
+                <button class="nav-tab" data-tab="history" role="tab" aria-selected="false">
                     <span class="tab-icon"><i data-lucide="clock-3" class="icon icon-purple"></i></span>
                     <span class="tab-label">History</span>
                 </button>
-                <!-- Key Tab (Mobile Only) -->
-                <button class="nav-tab mobile-only" id="navKeyBtn">
+                <button class="nav-tab mobile-only" id="navKeyBtn" type="button">
                     <span class="tab-icon"><i data-lucide="key-round" class="icon icon-gold"></i></span>
                     <span class="tab-label">Key</span>
                 </button>
             </nav>
 
             <div class="sidebar-footer">
-                <!-- Data Import Button (Hidden if data exists) -->
                 <button class="btn-import-data" id="importDataBtn" title="Import Data"
-                    style="display: none; font-size: 16px; margin-top: 10px; background: none; border: none; padding: 4px; cursor: pointer; opacity: 0.6;">
+                    style="display: none;">
                     <i data-lucide="download" class="icon icon-gold"></i>
+                    <span>Import</span>
                 </button>
-                <!-- Theme Picker Button -->
                 <button class="btn-theme-picker" id="themePickerBtn" title="Change Theme"
-                    style="font-size: 16px; margin-top: 10px; background: none; border: none; padding: 4px; cursor: pointer; opacity: 0.6;">
+                    type="button">
                     <i data-lucide="palette" class="icon icon-gold"></i>
+                    <span>Theme</span>
                 </button>
                 <!-- Theme Picker Popup -->
                 <div class="theme-picker-popup" id="themePickerPopup" style="display:none;">
@@ -147,11 +148,15 @@
                         </button>
                     </div>
                 </div>
-                <!-- Sync/Key Button -->
                 <button class="btn-sync-key" id="manageKeyBtn" title="Link Device / Secret Key"
-                    style="font-size: 16px; margin-top: 10px; background: none; border: none; padding: 4px; cursor: pointer; opacity: 0.6;">
+                    type="button">
                     <i data-lucide="key-round" class="icon icon-gold"></i>
+                    <span>Devices</span>
                 </button>
+                <div class="sync-status" id="syncStatus" data-state="syncing" aria-live="polite">
+                    <i data-lucide="refresh-cw" class="icon"></i>
+                    <span class="sync-label">Connecting</span>
+                </div>
             </div>
         </aside>
 
@@ -161,13 +166,33 @@
             <div class="view active" id="tasksView">
                 <header class="view-header">
                     <div class="header-info">
-                        <h1>Your Tasks</h1>
+                        <p class="page-eyebrow" id="todayDateLabel">Today</p>
+                        <h1>Today’s <em>page</em></h1>
                         <p class="subtitle" id="taskCount">0 tasks remaining</p>
                     </div>
                     <button class="btn btn-primary" id="addTaskBtn">
-                        <span>+</span> Add Task
+                        <i data-lucide="plus" class="icon"></i> Add Task
                     </button>
                 </header>
+
+                <section class="today-overview" aria-label="Today overview">
+                    <div class="today-progress-ring" id="todayProgressRing" style="--progress: 0;">
+                        <div class="today-progress-inner">
+                            <span id="todayProgressValue">0%</span>
+                            <small>complete</small>
+                        </div>
+                    </div>
+                    <div class="overview-copy">
+                        <span class="overview-kicker">Day ledger</span>
+                        <strong>Small things, kept honestly.</strong>
+                        <span>New page at 6:00 AM.</span>
+                    </div>
+                    <div class="overview-metrics">
+                        <div class="overview-metric"><span id="overviewOpenCount">0</span><small>open tasks</small></div>
+                        <div class="overview-metric"><span id="overviewRoutineCount">0/0</span><small>routines</small></div>
+                        <div class="overview-metric"><span id="overviewStreakCount">0</span><small>day streak</small></div>
+                    </div>
+                </section>
 
                 <div class="vacation-banner" id="vacationBanner" style="display: none;">
                     <span class="vacation-icon">🏖️</span>
@@ -215,6 +240,7 @@
             <div class="view" id="rewardsView">
                 <header class="view-header">
                     <div class="header-info">
+                        <p class="page-eyebrow">Spend with intention</p>
                         <h1>Reward Shop</h1>
                         <p class="subtitle">Treat yourself when you've earned it</p>
                     </div>
@@ -232,7 +258,8 @@
             <div class="view" id="statsView">
                 <header class="view-header">
                     <div class="header-info">
-                        <h1>Your Progress</h1>
+                        <p class="page-eyebrow">The long view</p>
+                        <h1>Your stats</h1>
                         <p class="subtitle">See how far you've come</p>
                     </div>
                 </header>
@@ -277,6 +304,7 @@
             <div class="view" id="progressView">
                 <header class="view-header">
                     <div class="header-info">
+                        <p class="page-eyebrow">Patterns over pressure</p>
                         <h1>Progress</h1>
                         <p class="subtitle">Track your consistency over time</p>
                     </div>
@@ -318,11 +346,12 @@
             <div class="view" id="historyView">
                 <header class="view-header">
                     <div class="header-info">
+                        <p class="page-eyebrow">A record of follow-through</p>
                         <h1>Task History</h1>
                         <p class="subtitle">All your completed tasks</p>
                     </div>
                     <button class="btn btn-secondary" id="viewJsonBtn">
-                        <i data-lucide="file-code" class="icon icon-gray"></i> View JSON
+                        <i data-lucide="download" class="icon icon-gray"></i> Export backup
                     </button>
                 </header>
 
@@ -633,7 +662,7 @@
             <div class="modal-body">
                 <p><strong>Your Secret Save Key:</strong></p>
                 <div style="display: flex; gap: 8px; margin-bottom: 20px;">
-                    <input type="text" id="secretKeyInput"
+                    <input type="password" id="secretKeyInput" autocomplete="off" spellcheck="false"
                         style="flex: 1; padding: 10px; font-family: monospace; font-size: 16px; border: 1px solid #444; background: #222; color: #eecfa1; border-radius: 6px;">
                     <button id="copyKeyBtn" class="btn btn-secondary" style="padding: 0 12px;"><i
                             data-lucide="clipboard-copy" class="icon icon-gray"></i></button>
@@ -700,11 +729,31 @@
             <span id="timerDisplay">00:00</span>
         </div>
         <div class="timer-controls">
-            <button id="timerPlayPauseBtn" class="timer-btn timer-btn-play" title="Pause"><i data-lucide="pause" class="icon" style="width: 16px; height: 16px;"></i></button>
-            <button id="timerStopBtn" class="timer-btn timer-btn-stop" title="Stop"><i data-lucide="square" class="icon" style="width: 14px; height: 14px; fill: currentColor;"></i></button>
+            <button id="timerPlayPauseBtn" class="timer-btn timer-btn-play" title="Pause" aria-label="Pause timer"><i data-lucide="pause" class="icon" style="width: 16px; height: 16px;"></i></button>
+            <button id="timerStopBtn" class="timer-btn timer-btn-stop" title="Stop" aria-label="Stop timer"><i data-lucide="square" class="icon" style="width: 14px; height: 14px; fill: currentColor;"></i></button>
         </div>
     </div>
-    <script type="module" src="app.js?v=1.1.0"></script>
+    <div class="command-palette" id="commandPalette" aria-hidden="true">
+        <div class="command-surface" role="dialog" aria-modal="true" aria-label="BrownBook command palette">
+            <div class="command-search">
+                <i data-lucide="sparkles" class="icon"></i>
+                <input id="commandSearchInput" type="text" placeholder="Where do you want to go?" autocomplete="off">
+                <kbd>esc</kbd>
+            </div>
+            <div class="command-results">
+                <button class="command-item" data-command="tasks"><span><i data-lucide="orbit" class="icon"></i>Today field</span><small>1</small></button>
+                <button class="command-item" data-command="add-task"><span><i data-lucide="plus" class="icon"></i>Capture a task</span><small>⌘N</small></button>
+                <button class="command-item" data-command="rewards"><span><i data-lucide="gem" class="icon"></i>Reward vault</span><small>2</small></button>
+                <button class="command-item" data-command="progress"><span><i data-lucide="waves" class="icon"></i>Momentum map</span><small>3</small></button>
+                <button class="command-item" data-command="history"><span><i data-lucide="archive" class="icon"></i>Memory archive</span><small>4</small></button>
+                <button class="command-item" data-command="theme"><span><i data-lucide="palette" class="icon"></i>Shift atmosphere</span><small>T</small></button>
+                <button class="command-item" data-command="devices"><span><i data-lucide="key-round" class="icon"></i>Linked devices</span><small>D</small></button>
+                <button class="command-item" data-command="import"><span><i data-lucide="download" class="icon"></i>Import a backup</span><small>I</small></button>
+            </div>
+        </div>
+    </div>
+    <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
+    <script type="module" src="app.js?v=3.0.0"></script>
 </body>
 
 </html>

@@ -1,0 +1,589 @@
+:root {
+    --paper: #f0e7d6;
+    --paper-2: #e8dcc6;
+    --ink: #29231d;
+    --muted: #776b5d;
+    --line: rgba(65, 47, 31, .16);
+    --leather: #2b211b;
+    --leather-2: #3a2b22;
+    --accent: #b55d32;
+    --green: #50734f;
+    --blue: #426b86;
+    --shadow: 0 20px 55px rgba(37, 25, 17, .16);
+    --bb-text: var(--ink);
+    --bb-text-soft: #594d42;
+    --bb-text-muted: var(--muted);
+    --bb-line: var(--line);
+    --bb-line-strong: rgba(65, 47, 31, .28);
+    --bb-surface: rgba(255, 253, 247, .5);
+    --bb-surface-strong: rgba(255, 253, 247, .72);
+    --bb-surface-hover: rgba(255, 253, 247, .9);
+    --bb-bg-elevated: #fffaf0;
+    --bb-amber: var(--accent);
+    --bb-amber-soft: #d58b62;
+    color-scheme: light;
+}
+
+html,
+body {
+    min-height: 100%;
+    overflow: auto;
+    background: #d8cdbb;
+}
+
+body {
+    color: var(--ink);
+    background:
+        linear-gradient(90deg, rgba(43, 33, 27, .08) 0 1px, transparent 1px) 0 0 / 28px 28px,
+        #d8cdbb;
+    font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+}
+
+.ambient-field,
+.command-palette,
+.command-trigger {
+    display: none !important;
+}
+
+.app-container {
+    display: grid;
+    grid-template-columns: 236px minmax(0, 1fr);
+    width: min(1480px, calc(100% - 36px));
+    min-height: calc(100vh - 36px);
+    margin: 18px auto;
+    overflow: hidden;
+    border-radius: 18px;
+    background: var(--leather);
+    box-shadow: 0 28px 80px rgba(37, 25, 17, .32);
+}
+
+.sidebar {
+    position: relative;
+    inset: auto;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    width: auto;
+    height: auto;
+    min-height: 100%;
+    padding: 34px 18px 18px;
+    border: 0;
+    border-radius: 0;
+    background:
+        linear-gradient(90deg, transparent calc(100% - 9px), rgba(0, 0, 0, .25)),
+        radial-gradient(circle at 25% 0%, rgba(255, 255, 255, .08), transparent 34%),
+        var(--leather);
+    box-shadow: none;
+    backdrop-filter: none;
+}
+
+.sidebar::before,
+.sidebar::after { display: none; }
+
+.sidebar-header {
+    display: grid;
+    gap: 24px;
+    width: auto;
+    height: auto;
+    padding: 0 8px 28px;
+    border-bottom: 1px solid rgba(240, 231, 214, .14);
+}
+
+.app-logo { align-items: flex-start; }
+.logo-icon {
+    width: 44px;
+    height: 44px;
+    border: 1px solid rgba(240, 231, 214, .25);
+    border-radius: 10px;
+    background: rgba(240, 231, 214, .07);
+    transform: none;
+}
+
+.app-name {
+    color: #f6eddf;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -.03em;
+}
+
+.app-tagline {
+    color: rgba(246, 237, 223, .48);
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 9px;
+    letter-spacing: .12em;
+}
+
+.coin-display {
+    margin: 0;
+    width: 100%;
+    padding: 14px;
+    border: 1px solid rgba(240, 231, 214, .14);
+    border-radius: 12px;
+    color: #f6eddf;
+    background: rgba(240, 231, 214, .06);
+}
+
+.coin-copy { display: grid; gap: 2px; }
+.coin-amount { color: #f6eddf; font-size: 28px; }
+.coin-label { color: rgba(246, 237, 223, .48); }
+
+.nav-tabs {
+    position: static !important;
+    inset: auto;
+    display: grid !important;
+    gap: 6px;
+    width: auto;
+    height: auto;
+    margin-top: 26px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+}
+
+.nav-tab {
+    min-height: 48px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 10px;
+    color: rgba(246, 237, 223, .62);
+    background: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.nav-tab:hover {
+    color: #fffaf0;
+    background: rgba(240, 231, 214, .07);
+}
+
+.nav-tab.active {
+    color: var(--ink);
+    background: var(--paper);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
+}
+
+.nav-tab.active .icon { color: var(--accent) !important; }
+.tab-label { display: block; font-size: 13px; }
+
+.sidebar-footer {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr);
+    margin-top: auto;
+    padding-top: 14px;
+    border-top: 1px solid rgba(240, 231, 214, .14);
+}
+
+.sidebar-footer button {
+    color: rgba(246, 237, 223, .62);
+}
+
+.sync-status { grid-column: 1 / -1; width: auto; font-size: 10px; }
+.theme-picker-popup { left: 0; right: auto; }
+
+.main-content {
+    min-width: 0;
+    min-height: 100%;
+    height: auto;
+    padding: 42px clamp(28px, 4vw, 70px) 60px;
+    overflow: visible;
+    background:
+        linear-gradient(90deg, rgba(118, 71, 43, .12), transparent 34px),
+        repeating-linear-gradient(transparent 0 31px, rgba(66, 107, 134, .08) 32px),
+        var(--paper);
+}
+
+.view {
+    width: min(1120px, 100%);
+    margin: 0 auto;
+}
+
+.view.active { animation: notebook-page-in .32s ease both; }
+@keyframes notebook-page-in {
+    from { opacity: 0; transform: translateX(10px); }
+    to { opacity: 1; transform: none; }
+}
+
+.view-header {
+    align-items: flex-end;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid var(--ink);
+}
+
+.page-eyebrow {
+    margin-bottom: 8px;
+    color: var(--accent);
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 10px;
+    letter-spacing: .16em;
+}
+
+.view-header h1 {
+    color: var(--ink);
+    font-size: clamp(42px, 5vw, 72px);
+    font-weight: 600;
+    line-height: .95;
+    letter-spacing: -.045em;
+}
+
+.view-header h1 em {
+    color: var(--accent);
+    font-style: italic;
+    -webkit-text-stroke: 0;
+}
+
+.view-header .subtitle {
+    color: var(--muted);
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.btn {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.btn-primary,
+.view-header .btn-primary {
+    min-width: auto;
+    height: 46px;
+    border-radius: 10px;
+    color: #fffaf0;
+    background: var(--ink);
+    box-shadow: 0 8px 22px rgba(41, 35, 29, .18);
+}
+
+.btn-secondary {
+    color: var(--ink);
+    border-color: var(--line);
+    background: rgba(255, 253, 247, .55);
+}
+
+#tasksView.active {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: 28px;
+    align-items: start;
+}
+
+#tasksView > .view-header,
+#tasksView > .vacation-banner {
+    grid-column: 1 / -1;
+}
+
+.today-overview {
+    position: sticky;
+    top: 24px;
+    grid-column: 2;
+    grid-row: 2;
+    display: grid;
+    gap: 18px;
+    min-height: 0;
+    margin: 0;
+    padding: 22px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: rgba(255, 252, 244, .72);
+    box-shadow: var(--shadow);
+    transform: rotate(.35deg);
+}
+
+.today-overview::after { display: none; }
+.today-progress-ring {
+    width: 112px;
+    margin: 0 auto;
+    background: conic-gradient(var(--accent) calc(var(--progress) * 1%), rgba(41, 35, 29, .1) 0);
+    filter: none;
+}
+.today-progress-ring::before { display: none; }
+.today-progress-ring::after { background: #fffaf0; }
+.today-progress-inner span { color: var(--ink); font-size: 25px; }
+.overview-kicker { color: var(--accent); }
+.overview-copy strong { color: var(--ink); font-size: 20px; }
+.overview-copy > span:last-child { color: var(--muted); }
+.overview-metrics { grid-template-columns: 1fr; }
+.overview-metric {
+    display: flex;
+    justify-content: space-between;
+    min-height: 42px;
+    padding: 0 0;
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
+}
+.overview-metric span { color: var(--ink); font-size: 20px; }
+.overview-metric small { order: -1; color: var(--muted); }
+
+.task-lists {
+    grid-column: 1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 28px;
+}
+
+#focusTasks,
+#recurringTasks,
+#activeTasks,
+#todayCompletedTasks,
+#suspendedTasksSection {
+    grid-column: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+}
+
+#focusTasks .section-title::after,
+#recurringTasks::before,
+#activeTasks::before { display: none; }
+
+.section-title {
+    margin-bottom: 9px;
+    color: var(--accent);
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 10px;
+}
+
+.task-list,
+#focusTaskList {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0;
+    border-top: 1px solid var(--line);
+}
+
+.task-row,
+#focusTaskList .task-row {
+    min-height: 66px;
+    padding: 12px 6px;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+    flex-wrap: nowrap;
+}
+
+.task-row:hover,
+#focusTaskList .task-row:hover {
+    background: rgba(255, 253, 247, .48);
+    box-shadow: none;
+}
+
+#focusTaskList .task-row {
+    min-height: 82px;
+    background: rgba(181, 93, 50, .055);
+}
+
+#focusTaskList .task-content { flex-basis: auto; }
+#focusTaskList .task-title,
+.task-title {
+    color: var(--ink);
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+#focusTaskList .task-title { font-size: 21px; }
+.task-notes,
+#focusTaskList .task-notes {
+    margin-top: 3px;
+    color: var(--muted);
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.task-checkbox {
+    width: 28px;
+    height: 28px;
+    border-width: 2px;
+    border-radius: 6px;
+    color: #fffaf0;
+}
+
+.task-checkbox.checked,
+.task-checkbox.completed-task {
+    border-color: var(--green);
+    background: var(--green);
+}
+
+.task-coins {
+    color: var(--ink);
+    background: rgba(41, 35, 29, .06);
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.task-row .task-pin,
+.task-row .task-delete,
+.task-row .recurring-delete,
+.task-row .recurring-suspend,
+.task-expand-btn {
+    opacity: .55;
+}
+
+.task-row:hover .task-pin,
+.task-row:hover .task-delete,
+.task-row:hover .recurring-delete,
+.task-row:hover .recurring-suspend,
+.task-row:hover .task-expand-btn {
+    opacity: 1;
+}
+
+.subtasks-container {
+    margin: 0 0 0 46px;
+    border-left: 2px solid rgba(181, 93, 50, .28);
+    border-radius: 0;
+    background: transparent;
+}
+
+.subtask-row:hover { background: rgba(255, 253, 247, .5); }
+.subtask-title { color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+.inline-subtask-input { color: var(--ink); background: rgba(255, 253, 247, .65); }
+
+#rewardsView .rewards-grid,
+#statsView .stats-content,
+#progressView .progress-content,
+#historyView .history-content {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+}
+
+.shop-item-card,
+.reward-card,
+.stat-card,
+.chart-container,
+.summary-card,
+.history-task-row,
+.difficulty-breakdown,
+.streak-leaderboard,
+.rewards-claimed-card {
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: rgba(255, 252, 244, .62);
+    box-shadow: 0 8px 22px rgba(37, 25, 17, .08);
+}
+
+.shop-item-card:nth-child(odd),
+.reward-card:nth-child(odd) { transform: rotate(-.25deg); }
+.shop-item-card:nth-child(even),
+.reward-card:nth-child(even) { transform: rotate(.25deg); }
+
+.shop-item-name,
+.reward-name,
+.stat-value,
+.summary-value,
+.history-date {
+    color: var(--ink);
+}
+
+.shop-claim-btn,
+.claim-btn {
+    border-radius: 8px;
+    color: #fffaf0;
+    background: var(--green);
+}
+
+.progress-tabs,
+.time-filter,
+.progress-tab {
+    border-radius: 8px;
+}
+
+.progress-tabs { background: rgba(255, 252, 244, .55); }
+.progress-tab.active { color: var(--ink); background: #fffaf0; }
+.time-filter.active { color: #fffaf0; background: var(--ink); }
+.bar-fill-container { background: rgba(41, 35, 29, .07); }
+.bar-label,
+.bar-value { color: var(--muted); }
+
+.history-list { gap: 30px; }
+.history-date { border-bottom-color: var(--ink); }
+.history-task-row {
+    border-width: 0 0 1px;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.modal-content {
+    color: var(--ink);
+    border-radius: 8px;
+    background: #fffaf0;
+}
+
+.modal-header,
+.modal-footer { background: #fffaf0; }
+
+input[type="text"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="datetime-local"],
+select,
+textarea,
+#secretKeyInput,
+#suspendDaysInput,
+#suspendDateInput,
+#importJsonInput {
+    color: var(--ink) !important;
+    background: rgba(255, 255, 255, .7) !important;
+}
+
+@media (max-width: 900px) {
+    body { padding-bottom: 0; }
+    .app-container {
+        display: block;
+        width: 100%;
+        min-height: 100vh;
+        margin: 0;
+        border-radius: 0;
+    }
+    .sidebar {
+        position: sticky !important;
+        top: 0;
+        z-index: 100;
+        min-height: 0;
+        padding: 12px 14px;
+    }
+    .sidebar-header {
+        display: flex;
+        justify-content: space-between;
+        padding: 0;
+        border: 0;
+    }
+    .brand-copy { display: none; }
+    .coin-display { width: auto; padding: 8px 12px; }
+    .coin-amount { font-size: 18px; }
+    .coin-label { display: none; }
+    .nav-tabs {
+        position: fixed !important;
+        inset: auto 0 0 !important;
+        z-index: 200;
+        grid-template-columns: repeat(6, 1fr);
+        height: 66px;
+        padding: 6px;
+        background: var(--leather);
+    }
+    .nav-tab { flex-direction: column; justify-content: center; padding: 0; }
+    .tab-label { font-size: 8px; }
+    .mobile-only { display: flex !important; }
+    .sidebar-footer { display: none !important; }
+    .main-content { padding: 26px 16px 92px; }
+    #tasksView.active { display: block; }
+    .today-overview { position: static; margin-bottom: 26px; transform: none; }
+    .overview-metrics { grid-template-columns: repeat(3, 1fr); }
+    .overview-metric { display: grid; }
+    .overview-metric small { order: 0; }
+    .task-title,
+    #focusTaskList .task-title { white-space: normal; }
+    .shop-items,
+    .rewards-list,
+    .stats-cards { grid-template-columns: 1fr; }
+}

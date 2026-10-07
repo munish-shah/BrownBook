@@ -1,10 +1,11 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read/write access to any document in the "users" collection
-    // Each user has their own document identified by their secret key
     match /users/{userId} {
-      allow read, write: if true;
+      // BrownBook currently treats the document ID as a shared secret.
+      // Block collection enumeration while preserving the existing clients.
+      allow list: if false;
+      allow get, create, update, delete: if true;
     }
   }
 }
