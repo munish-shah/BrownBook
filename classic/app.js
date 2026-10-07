@@ -1,0 +1,3718 @@
+import { db, doc, onSnapshot, setDoc, getDoc } from "./firebase-config.js";
+
+let DATA_DOC_REF = null; // Set dynamically based on secret key
+let SECRET_KEY = localStorage.getItem('brownbook_secret_key');
+
+// Generate random key if none exists (First load)
+if (!SECRET_KEY) {
+    SECRET_KEY = 'user_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+    localStorage.setItem('brownbook_secret_key', SECRET_KEY);
+}
+
+// Set reference immediately
+DATA_DOC_REF = doc(db, "users", SECRET_KEY);
+let currentSuspendTaskId = null;
+
+// Difficulty configurations
+const DIFFICULTIES = {
+    quick: { emoji: '<span class="diff-dot diff-quick"></span>', name: 'Quick', coins: 5, time: '< 5 min' },
+    easy: { emoji: '<span class="diff-dot diff-easy"></span>', name: 'Easy', coins: 15, time: '5-15 min' },
+    medium: { emoji: '<span class="diff-dot diff-medium"></span>', name: 'Medium', coins: 25, time: '15-45 min' },
+    hard: { emoji: '<span class="diff-dot diff-hard"></span>', name: 'Hard', coins: 50, time: '45-90 min' },
+    epic: { emoji: '<span class="diff-dot diff-epic"></span>', name: 'Epic', coins: 75, time: '2+ hours' },
+    placeholder: { emoji: '<span class="diff-dot diff-placeholder"></span>', name: 'Placeholder', coins: 0, time: 'Routine' }
+};
+
+const CATEGORIES = {
+    food: '<i data-lucide="utensils" class="icon icon-coral"></i>',
+    entertainment: '<i data-lucide="gamepad-2" class="icon icon-purple"></i>',
+    purchase: '<i data-lucide="shopping-bag" class="icon icon-blue"></i>',
+    experience: '<i data-lucide="sparkles" class="icon icon-amber"></i>',
+    selfcare: '<i data-lucide="heart-pulse" class="icon icon-pink"></i>',
+    other: '<i data-lucide="gift" class="icon icon-gray"></i>'
+};
+
+// Preset shop items with scaling prices
+// Shop items are now user-created only (no presets)
+const SHOP_ITEMS = [];
+
+// Preset recurring tasks (added on first run)
+const PRESET_RECURRING_TASKS = [
+    { id: 'brush_morning', title: 'Brush', notes: 'morning', difficulty: 'quick' },
+    { id: 'brush_night', title: 'Brush', notes: 'night', difficulty: 'quick' },
+    { id: 'floss', title: 'Floss', notes: '', difficulty: 'quick' }
+];
+
+// App state - Default structure
+let appData = {
+    tasks: [],
+    recurringTasks: [],
+    recurringCompletions: {},
+    completedHistory: [],
+    rewards: [],
+    customShopItems: [],
+    focusPinnedIds: [], // Ordered list of pinned task IDs for Focus section
+    vacationDays: ['2026-05-15', '2026-05-16', '2026-05-17', '2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09', '2026-08-10'], // Dates treated as 100% (streak protected)
+    stats: {
+        totalCoinsEarned: 0,
+        currentBalance: 0,
+        tasksCompletedQuick: 0,
+        tasksCompletedEasy: 0,
+        tasksCompletedMedium: 0,
+        tasksCompletedHard: 0,
+        tasksCompletedEpic: 0,
+        rewardsClaimed: 0,
+        currentStreak: 0,
+        bestStreak: 0,
+        lastActiveDate: null
+    },
+    shopPurchases: {},
+    presetsInitialized: false
+};
+
+let currentRewardToClaim = null;
+let currentShopItemToClaim = null;
+let currentTimerDurationToStart = 0;
+let isFirstLoad = true;
+
+// Reward Timer State
+let rewardTimerInterval = null;
+let rewardTimerEndTime = null;
+let rewardTimerRemaining = 0;
+let isRewardTimerPaused = false;
+let audioContext = null;
+let beepInterval = null;
+
+// ========== Reset Time Configuration ==========
+// To change the reset time: add a new entry with the date it takes effect.
+// Historical completions will always use the reset hour that was active at the time.
+const DEFAULT_RESET_HOUR = 6; // Original reset hour before any transitions
+const RESET_TRANSITIONS = [];
+
+// Get the current reset hour (for "what day is it NOW?" checks)
+function getCurrentResetHour() {
+    const last = RESET_TRANSITIONS[RESET_TRANSITIONS.length - 1];
+    return last ? last.hour : DEFAULT_RESET_HOUR;
+}
+
+// Get the reset hour that was active when a historical timestamp was recorded
+function getResetHourForTimestamp(date) {
+    // Walk transitions in reverse to find which was active at this date
+    for (let i = RESET_TRANSITIONS.length - 1; i >= 0; i--) {
+        const t = RESET_TRANSITIONS[i];
+        if (date >= new Date(t.date + 'T00:00:00')) {
+            return t.hour;
+        }
+    }
+    return DEFAULT_RESET_HOUR;
+}
+
+// Initialize app with Firebase
+// ========== Theme Switcher ==========
+const THEME_COLORS = {
+    default: '#1A1816', midnight: '#1A1A2E', forest: '#141E14',
+    ocean: '#0F1923', rose: '#1E1418', charcoal: '#1C1C1E',
+    obsidian: '#0A0A0A', cyber: '#0D0D1A', ember: '#1A1210',
+    slate: '#15191E', mocha: '#1E1714', aurora: '#0E1A1A',
+    starnight: '#181A28', starday: '#EBF4F4'
+};
+
+function applyTheme(themeName) {
+    if (themeName === 'default') {
+        document.documentElement.removeAttribute('data-theme');
+    } else {
+        document.documentElement.setAttribute('data-theme', themeName);
+    }
+    // Update title bar color
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', THEME_COLORS[themeName] || THEME_COLORS.default);
+    // Highlight active swatch
+    document.querySelectorAll('.theme-swatch').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.themeValue === themeName);
+    });
+}
+
+function setupThemePicker() {
+    const btn = document.getElementById('themePickerBtn');
+    const popup = document.getElementById('themePickerPopup');
+    if (!btn || !popup) return;
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        popup.style.display = popup.style.display === 'none' ? 'block' : 'none';
+    });
+
+    popup.addEventListener('click', (e) => e.stopPropagation());
+
+    document.addEventListener('click', () => {
+        popup.style.display = 'none';
+    });
+
+    popup.querySelectorAll('.theme-swatch').forEach(swatch => {
+        swatch.addEventListener('click', () => {
+            const theme = swatch.dataset.themeValue;
+            applyTheme(theme);
+            localStorage.setItem('brownbook-theme', theme);
+            // Only persist to Firebase after data has fully loaded
+            if (!isFirstLoad && appData) {
+                if (!appData.settings) appData.settings = {};
+                appData.settings.theme = theme;
+                saveData();
+            }
+            popup.style.display = 'none';
+        });
+    });
+}
+
+// Load theme immediately (before Firebase) from localStorage
+(function () {
+    const savedTheme = localStorage.getItem('brownbook-theme');
+    if (savedTheme && savedTheme !== 'default') {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+})();
+
+async function init() {
+    // Initialize Lucide icons for static HTML elements
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    setupEventListeners();
+    setupKeyManagement(); // Setup the new key UI
+    setupThemePicker(); // Setup theme switcher
+
+    console.log("Using Secret Key:", SECRET_KEY);
+
+    // Listen for real-time updates from Cloud Firestore
+    onSnapshot(DATA_DOC_REF, (doc) => {
+        if (doc.exists()) {
+            const data = doc.data();
+            appData = { ...appData, ...data }; // Merge with defaults
+
+            // Show sync indicator (if element exists)
+            const syncStatus = document.getElementById('syncStatus');
+            if (syncStatus) {
+                syncStatus.style.display = 'block';
+                setTimeout(() => {
+                    syncStatus.style.opacity = '1';
+                    setTimeout(() => syncStatus.style.opacity = '0.5', 1000);
+                }, 100);
+            }
+
+            // Always show import button to allow data restoration/migration
+            document.getElementById('importDataBtn').style.display = 'block';
+
+            // Always clean up expired tasks on every load/sync
+            cleanupExpiredTasks();
+
+            // Run other migrations/cleanup only on first load
+            if (isFirstLoad) {
+                runMigrationsAndCleanup();
+                runBackfillJan31(); // One-time fix for missing Jan 31st tasks
+                isFirstLoad = false;
+            }
+
+            renderAll();
+
+            // Sync theme from Firebase
+            if (appData.settings && appData.settings.theme) {
+                applyTheme(appData.settings.theme);
+                localStorage.setItem('brownbook-theme', appData.settings.theme);
+            }
+        } else {
+            // New user or empty db
+            console.log("No data found for this key, starting fresh.");
+            // Show import button
+            document.getElementById('importDataBtn').style.display = 'block';
+
+            // Initialize presets if needed
+            if (!appData.presetsInitialized) {
+                addPresets();
+            }
+            renderAll();
+        }
+    });
+
+    // Auto-refresh every minute for timer updates and expired task cleanup
+    setInterval(() => {
+        cleanupExpiredTasks(); // Delete any newly expired tasks
+        renderTasks(); // Update countdown timers
+    }, 60000); // 60,000ms = 1 minute
+}
+
+function addPresets() {
+    PRESET_RECURRING_TASKS.forEach(preset => {
+        appData.recurringTasks.push({
+            id: preset.id,
+            title: preset.title,
+            notes: preset.notes,
+            difficulty: preset.difficulty,
+            createdAt: new Date().toISOString()
+        });
+    });
+    appData.presetsInitialized = true;
+    saveData();
+}
+
+// Clean up expired tasks - runs on every sync
+async function cleanupExpiredTasks() {
+    const now = new Date();
+    const expiredTasks = appData.tasks.filter(t => t.expiresAt && new Date(t.expiresAt) <= now);
+
+    if (expiredTasks.length > 0) {
+        appData.tasks = appData.tasks.filter(t => !t.expiresAt || new Date(t.expiresAt) > now);
+        console.log(`Removed ${expiredTasks.length} expired task(s):`, expiredTasks.map(t => t.title));
+        await saveData();
+    }
+}
+
+async function runMigrationsAndCleanup() {
+    let needsSave = false;
+
+    // Ensure fields exist
+    if (!appData.shopPurchases) { appData.shopPurchases = {}; needsSave = true; }
+    if (!appData.customShopItems) { appData.customShopItems = []; needsSave = true; }
+    if (!appData.recurringTasks) { appData.recurringTasks = []; needsSave = true; }
+    if (!appData.recurringCompletions) { appData.recurringCompletions = {}; needsSave = true; }
+    if (!appData.completedHistory) { appData.completedHistory = []; needsSave = true; }
+    if (!appData.vacationDays) { 
+        appData.vacationDays = ['2026-05-15', '2026-05-16', '2026-05-17', '2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09', '2026-08-10']; 
+        needsSave = true; 
+    } else {
+        const augVacDays = ['2026-08-05', '2026-08-06', '2026-08-07', '2026-08-08', '2026-08-09', '2026-08-10'];
+        augVacDays.forEach(day => {
+            if (!appData.vacationDays.includes(day)) {
+                appData.vacationDays.push(day);
+                needsSave = true;
+            }
+        });
+    }
+
+    // Migrate completed tasks
+    const completedInTasks = appData.tasks.filter(t => t.completed);
+    if (completedInTasks.length > 0) {
+        appData.completedHistory = [...completedInTasks, ...appData.completedHistory];
+        appData.tasks = appData.tasks.filter(t => !t.completed);
+        needsSave = true;
+    }
+
+    // Clear stale recurring completions
+    const today = getTodayDateString();
+
+    // One-time migration: Update existing shop item emojis to Lucide icons
+    if (!appData.stats.emoji_to_lucide_migration) {
+        const emojiToLucide = {
+            '🍕': '<i data-lucide="utensils" class="icon icon-coral"></i>',
+            '🎮': '<i data-lucide="gamepad-2" class="icon icon-purple"></i>',
+            '🛍️': '<i data-lucide="shopping-bag" class="icon icon-blue"></i>',
+            '✨': '<i data-lucide="sparkles" class="icon icon-amber"></i>',
+            '💆': '<i data-lucide="heart-pulse" class="icon icon-pink"></i>',
+            '🎁': '<i data-lucide="gift" class="icon icon-gray"></i>',
+            '📺': '<i data-lucide="tv" class="icon icon-blue"></i>',
+            '🎬': '<i data-lucide="clapperboard" class="icon icon-purple"></i>',
+        };
+        let migrated = false;
+        (appData.customShopItems || []).forEach(item => {
+            if (item.emoji && emojiToLucide[item.emoji]) {
+                item.emoji = emojiToLucide[item.emoji];
+                migrated = true;
+            }
+        });
+        (appData.rewards || []).forEach(reward => {
+            if (reward.emoji && emojiToLucide[reward.emoji]) {
+                reward.emoji = emojiToLucide[reward.emoji];
+                migrated = true;
+            }
+        });
+        appData.stats.emoji_to_lucide_migration = true;
+        needsSave = true;
+    }
+
+
+
+
+
+    // Cleanup: Sync History with Recurrence State
+    // If it's in history for TODAY but NOT in recurringCompletions, it means it was unchecked (but history delete failed).
+    // So we should REMOVE it from History.
+    // If it's in recurringCompletions but NOT history, we leave it (or add to history? strictly logic 1 is mostly needed).
+
+    if (appData.completedHistory) {
+        // Filter OUT zombie tasks
+        const initialLength = appData.completedHistory.length;
+        appData.completedHistory = appData.completedHistory.filter(h => {
+            if (!h.isRecurring || !h.completedAt) return true; // Keep regular tasks
+
+            // Check if this recurring task matches TODAY
+            const date = new Date(h.completedAt);
+            if (date.getHours() < getResetHourForTimestamp(date)) date.setDate(date.getDate() - 1);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hDate = `${year}-${month}-${day}`;
+
+            if (hDate === today) {
+                // It is today's record. Is it marked completed in state?
+                if (!appData.recurringCompletions[h.recurringId]) {
+                    // It is NOT in completions map. It's a zombie. Kill it.
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        if (appData.completedHistory.length !== initialLength) {
+            console.log("Removed zombie history items.");
+            needsSave = true;
+        }
+    }
+
+    // REVERSE Cleanup: If it's in recurringCompletions but NOT in history, it's orphaned (remove it)
+    // This fixes tasks showing as "checked" without actually being completed
+    for (const taskId in appData.recurringCompletions) {
+        if (appData.recurringCompletions[taskId] === today) {
+            // Check if there's a matching history entry for this task today
+            const hasHistoryEntry = appData.completedHistory.some(h => {
+                if (h.recurringId !== taskId || !h.completedAt) return false;
+
+                const date = new Date(h.completedAt);
+                if (date.getHours() < getResetHourForTimestamp(date)) date.setDate(date.getDate() - 1);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hDate = `${year}-${month}-${day}`;
+
+                return hDate === today;
+            });
+
+            if (!hasHistoryEntry) {
+                // Orphaned completion - remove it
+                console.log(`Removing orphaned completion for ${taskId}`);
+                delete appData.recurringCompletions[taskId];
+                needsSave = true;
+            }
+        }
+    }
+
+    // Also remove stale completions from map (different day)
+    for (const taskId in appData.recurringCompletions) {
+        if (appData.recurringCompletions[taskId] !== today) {
+            delete appData.recurringCompletions[taskId];
+            needsSave = true;
+        }
+    }
+
+    if (needsSave) {
+        await saveData();
+    }
+}
+
+// Save data to Cloud Firestore
+async function saveData() {
+    try {
+        await setDoc(DATA_DOC_REF, appData);
+        // Sync indicator flash
+        const syncStatus = document.getElementById('syncStatus');
+        if (syncStatus) {
+            syncStatus.style.opacity = '1';
+            setTimeout(() => syncStatus.style.opacity = '0.5', 500);
+        }
+    } catch (e) {
+        console.error("Error saving to cloud:", e);
+        alert("Sync error! Check your connection.");
+    }
+}
+
+// Event Listeners
+// Toggle Subtask
+async function toggleSubtask(event, parentId, subtaskId, type) {
+    if (event) event.stopPropagation(); // Prevent main task toggle
+
+    const listVar = type === 'recurring' ? 'recurringTasks' : 'tasks';
+    const task = appData[listVar].find(t => t.id === parentId);
+    if (!task) return;
+
+    const subtask = task.subtasks.find(s => s.id === subtaskId);
+    if (!subtask) return;
+
+    // Toggle completion
+    subtask.completed = !subtask.completed;
+
+    // Update DOM directly (no flicker)
+    const checkboxEl = document.querySelector(`.subtask-checkbox[data-subtask-id="${subtaskId}"]`);
+    const rowEl = checkboxEl?.closest('.subtask-row');
+    if (checkboxEl) {
+        if (subtask.completed) {
+            checkboxEl.classList.add('completed');
+            checkboxEl.textContent = '✓';
+            rowEl?.classList.add('completed');
+        } else {
+            checkboxEl.classList.remove('completed');
+            checkboxEl.textContent = '';
+            rowEl?.classList.remove('completed');
+        }
+    }
+
+    // Update progress bar in real-time
+    const taskRow = document.querySelector(`.task-row[data-id="${parentId}"]`);
+    if (taskRow) {
+        const progressBar = taskRow.querySelector('.subtask-progress-bar');
+        const progressText = taskRow.querySelector('.subtask-progress-text');
+        if (progressBar && progressText) {
+            const total = task.subtasks.length;
+            const completed = task.subtasks.filter(s => s.completed).length;
+            const percent = Math.round((completed / total) * 100);
+            progressBar.style.width = `${percent}%`;
+            progressText.textContent = `${completed}/${total} (${percent}%)`;
+        }
+    }
+
+    // Coin logic
+    if (task.distributeCoins && subtask.coins > 0) {
+        if (subtask.completed) {
+            appData.stats.totalCoinsEarned += subtask.coins;
+            appData.stats.currentBalance += subtask.coins;
+        } else {
+            appData.stats.currentBalance -= subtask.coins;
+            appData.stats.totalCoinsEarned -= subtask.coins;
+        }
+        // Update coin display immediately
+        updateCoinDisplay();
+    }
+
+    // Check if ALL subtasks are completed
+    const allCompleted = task.subtasks.every(s => s.completed);
+
+    // If all subtasks done, complete the main task (but only if it's NOT already completed)
+    if (allCompleted) {
+        if (type === 'task' && !task.completed) {
+            await toggleTask(parentId, true);
+            return;
+        } else if (type === 'recurring' && !isRecurringCompletedToday(parentId)) {
+            await toggleRecurringTask(parentId, true);
+            return;
+        }
+    } else {
+        // If we uncheck a subtask, and the main task WAS completed, uncomplete it
+        if (type === 'task' && task.completed) {
+            await uncompleteTask(parentId);
+            return;
+        }
+        if (type === 'recurring' && isRecurringCompletedToday(parentId)) {
+            const historyIndex = appData.completedHistory.findIndex(h => {
+                if (!h.completedAt || h.recurringId !== parentId) return false;
+                const d = new Date(h.completedAt);
+                if (d.getHours() < getResetHourForTimestamp(d)) d.setDate(d.getDate() - 1);
+                return getDateString(d) === getTodayDateString();
+            });
+            if (historyIndex > -1) {
+                const entry = appData.completedHistory[historyIndex];
+                appData.stats.totalCoinsEarned -= entry.coins;
+                appData.stats.currentBalance -= entry.coins;
+                const diffKey = `tasksCompleted${entry.difficulty.charAt(0).toUpperCase() + entry.difficulty.slice(1)}`;
+                if (appData.stats[diffKey] > 0) appData.stats[diffKey]--;
+                appData.completedHistory.splice(historyIndex, 1);
+            }
+            // Need full re-render when main task state changes
+            await saveData();
+            renderTasks();
+            return;
+        }
+    }
+
+    // Just save data, no re-render needed for simple subtask toggle
+    await saveData();
+}
+
+// Toggle visibility of subtasks
+function toggleSubtasks(event, taskId) {
+    if (event) event.stopPropagation();
+    const container = document.getElementById(`subtasks-${taskId}`);
+    const btn = event.target;
+    if (container) {
+        container.classList.toggle('open');
+        btn.classList.toggle('expanded');
+    }
+}
+
+// Add subtask to an existing task
+async function addSubtaskToExisting(parentId, taskType, title) {
+    const listVar = taskType === 'recurring' ? 'recurringTasks' : 'tasks';
+    const task = appData[listVar].find(t => t.id === parentId);
+    if (!task) return;
+
+    // Initialize subtasks array if it doesn't exist
+    if (!task.subtasks) {
+        task.subtasks = [];
+    }
+
+    // Create new subtask
+    const newSubtask = {
+        id: Date.now().toString(),
+        title: title,
+        completed: false,
+        coins: 0 // User needs to redistribute if using coin distribution
+    };
+
+    task.subtasks.push(newSubtask);
+
+    await saveData();
+    renderTasks();
+}
+
+// Delete a subtask from an existing task
+async function deleteSubtask(parentId, subtaskId, taskType) {
+    const listVar = taskType === 'recurring' ? 'recurringTasks' : 'tasks';
+    const task = appData[listVar].find(t => t.id === parentId);
+    if (!task || !task.subtasks) return;
+
+    const subtaskIndex = task.subtasks.findIndex(s => s.id === subtaskId);
+    if (subtaskIndex === -1) return;
+
+    // If subtask was completed and had distributed coins, deduct them
+    const subtask = task.subtasks[subtaskIndex];
+    if (task.distributeCoins && subtask.completed && subtask.coins > 0) {
+        appData.stats.totalCoinsEarned -= subtask.coins;
+        appData.stats.currentBalance -= subtask.coins;
+    }
+
+    // Remove the subtask
+    task.subtasks.splice(subtaskIndex, 1);
+
+    await saveData();
+    renderTasks();
+}
+
+// Validate subtask coin distribution
+function validateSubtaskCoins() {
+    const distribute = document.getElementById('distributeCoinsToggle').checked;
+    const msg = document.getElementById('subtaskValidationMsg');
+
+    if (!distribute) {
+        msg.style.display = 'none';
+        return;
+    }
+
+    const rows = document.querySelectorAll('.subtask-input-row');
+    if (rows.length === 0) {
+        msg.style.display = 'none';
+        return;
+    }
+
+    let subtotal = 0;
+    rows.forEach(row => {
+        const coinInput = row.querySelector('input[type="number"]');
+        if (coinInput) {
+            subtotal += parseInt(coinInput.value) || 0;
+        }
+    });
+
+    const selectedDiff = document.querySelector('.diff-btn.selected');
+    const target = selectedDiff ? parseInt(selectedDiff.dataset.coins) : 25;
+
+    if (subtotal !== target) {
+        msg.textContent = `Total: ${subtotal}/${target} coins`;
+        msg.style.color = '#ef4444';
+        msg.style.display = 'block';
+    } else {
+        msg.textContent = `Total: ${subtotal}/${target} coins ✓`;
+        msg.style.color = '#22c55e';
+        msg.style.display = 'block';
+    }
+}
+
+// Add logic to setupEventListeners for adding subtasks in UI
+function setupEventListeners() {
+    // Add Subtask Button
+    document.getElementById('addSubtaskBtn').addEventListener('click', () => {
+        const container = document.getElementById('subtaskListInput');
+        const distribute = document.getElementById('distributeCoinsToggle').checked;
+        const id = Date.now();
+
+        const row = document.createElement('div');
+        row.className = `subtask-input-row ${distribute ? 'distributed' : ''}`;
+        row.innerHTML = `
+            <input type="text" placeholder="Subtask title">
+            <input type="number" placeholder="Coins" value="0">
+            <button class="btn-remove-subtask" onclick="this.parentElement.remove()">×</button>
+        `;
+        container.appendChild(row);
+    });
+
+    // Toggle Distribution Mode
+    document.getElementById('distributeCoinsToggle').addEventListener('change', (e) => {
+        const isDistrubted = e.target.checked;
+        const rows = document.querySelectorAll('.subtask-input-row');
+        rows.forEach(row => {
+            if (isDistrubted) row.classList.add('distributed');
+            else row.classList.remove('distributed');
+        });
+
+        // Show/Hide validation message
+        const difficulty = document.querySelector('.diff-btn.selected');
+        if (difficulty) validateSubtaskCoins();
+    });
+
+    // Difficulty change - re-validate
+    document.querySelectorAll('.diff-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            setTimeout(validateSubtaskCoins, 10);
+        });
+    });
+
+    // Input change validation
+    document.getElementById('subtaskListInput').addEventListener('input', validateSubtaskCoins);
+
+    // Navigation tabs
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+    });
+
+    // Add Task
+    document.getElementById('addTaskBtn').addEventListener('click', openAddTaskModal);
+    document.getElementById('closeTaskModal').addEventListener('click', closeAddTaskModal);
+    document.getElementById('cancelTask').addEventListener('click', closeAddTaskModal);
+    document.getElementById('saveTask').addEventListener('click', saveNewTask);
+    // Suspend Modal Events
+    document.getElementById('closeSuspendModal').addEventListener('click', closeSuspendModal);
+    document.getElementById('cancelSuspend').addEventListener('click', closeSuspendModal);
+    document.getElementById('confirmSuspend').addEventListener('click', handleSuspendConfirm);
+    
+    document.querySelectorAll('input[name="suspendType"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            document.getElementById('suspendDaysContainer').style.display = e.target.value === 'days' ? 'flex' : 'none';
+            document.getElementById('suspendDateContainer').style.display = e.target.value === 'date' ? 'block' : 'none';
+        });
+    });
+    // Import Data Flow
+    document.getElementById('importDataBtn').addEventListener('click', () => {
+        document.getElementById('importModal').classList.add('open');
+    });
+    document.getElementById('closeImportModal').addEventListener('click', () => {
+        document.getElementById('importModal').classList.remove('open');
+    });
+    document.getElementById('cancelImport').addEventListener('click', () => {
+        document.getElementById('importModal').classList.remove('open');
+    });
+    document.getElementById('confirmImport').addEventListener('click', async () => {
+        const jsonStr = document.getElementById('importJsonInput').value;
+        try {
+            const importedData = JSON.parse(jsonStr);
+            if (!importedData.stats) throw new Error("Invalid data format");
+
+            if (confirm("This will OVERWRITE any existing cloud data. Are you sure?")) {
+                appData = importedData;
+                await saveData();
+                document.getElementById('importModal').classList.remove('open');
+                window.location.reload();
+            }
+        } catch (e) {
+            alert("Invalid JSON data. Please check what you pasted.");
+        }
+    });
+
+    // Difficulty picker
+    document.querySelectorAll('.diff-btn').forEach(btn => {
+        btn.addEventListener('click', () => selectDifficulty(btn));
+    });
+
+    // Recurring toggle
+    document.getElementById('recurringTaskToggle').addEventListener('change', (e) => {
+        document.getElementById('recurringOptions').style.display = e.target.checked ? 'block' : 'none';
+        // Hide expiration for recurring tasks (they reset, not expire)
+        document.getElementById('expirationOptions').style.display = e.target.checked ? 'none' : 'block';
+        
+        // Prevent Placeholders from being recurring
+        if (e.target.checked) {
+            const placeholderBtn = document.querySelector('.diff-btn[data-difficulty="placeholder"]');
+            if (placeholderBtn.classList.contains('selected')) {
+                selectDifficulty(document.querySelector('.diff-btn[data-difficulty="quick"]'));
+            }
+            placeholderBtn.style.display = 'none';
+        } else {
+            document.querySelector('.diff-btn[data-difficulty="placeholder"]').style.display = '';
+        }
+    });
+
+    // Recurrence type radio
+    document.querySelectorAll('input[name="recurrenceType"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            document.getElementById('intervalSettings').style.display =
+                e.target.value === 'interval' ? 'block' : 'none';
+        });
+    });
+
+    // Expiration dropdown - show custom datetime picker when "custom" selected
+    document.getElementById('taskExpiration').addEventListener('change', (e) => {
+        const customDT = document.getElementById('customExpirationDT');
+        if (e.target.value === 'custom') {
+            customDT.style.display = 'block';
+            // Set min to now
+            const now = new Date();
+            const localIso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+            customDT.min = localIso;
+            customDT.value = ''; // Clear any old value
+        } else {
+            customDT.style.display = 'none';
+        }
+    });
+
+    // Add Reward
+    document.getElementById('addRewardBtn').addEventListener('click', openAddRewardModal);
+    document.getElementById('closeRewardModal').addEventListener('click', closeAddRewardModal);
+    document.getElementById('cancelReward').addEventListener('click', closeAddRewardModal);
+    document.getElementById('saveReward').addEventListener('click', saveNewReward);
+
+    // Category picker
+    document.querySelectorAll('.cat-btn').forEach(btn => {
+        btn.addEventListener('click', () => selectCategory(btn));
+    });
+
+    // Cost picker & Slider
+    document.querySelectorAll('.cost-btn').forEach(btn => {
+        btn.addEventListener('click', () => selectCost(parseInt(btn.dataset.cost)));
+    });
+    document.getElementById('costSlider').addEventListener('input', (e) => {
+        selectCost(parseInt(e.target.value));
+    });
+
+    // Daily Shop toggle
+    document.getElementById('addToShopToggle').addEventListener('change', (e) => {
+        document.getElementById('scalingOptions').style.display = e.target.checked ? 'block' : 'none';
+    });
+
+    // Scaling type picker
+    document.querySelectorAll('.scaling-btn').forEach(btn => {
+        btn.addEventListener('click', () => selectScalingType(btn.dataset.type));
+    });
+
+    // Scaling presets & Slider
+    document.querySelectorAll('.scale-preset').forEach(btn => {
+        btn.addEventListener('click', () => selectScaling(parseInt(btn.dataset.value)));
+    });
+    document.getElementById('scalingSlider').addEventListener('input', (e) => {
+        selectScaling(parseInt(e.target.value));
+    });
+
+    // Claim modal
+    document.getElementById('closeClaimModal').addEventListener('click', closeClaimModal);
+    document.getElementById('cancelClaim').addEventListener('click', closeClaimModal);
+    document.getElementById('confirmClaim').addEventListener('click', confirmClaimReward);
+
+    // View JSON button
+    document.getElementById('viewJsonBtn').addEventListener('click', viewJsonData);
+
+    // Close modals on backdrop click
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('open');
+            }
+        });
+    });
+
+    // Enter key shortcuts
+    document.getElementById('taskTitle').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') saveNewTask();
+    });
+    document.getElementById('rewardName').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') saveNewReward();
+    });
+
+    // Progress view - Tab switcher (Recurring / Non-recurring)
+    document.querySelectorAll('.progress-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.progress-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            renderProgress();
+        });
+    });
+
+    // Progress view - Time filters (Daily / Weekly / Monthly)
+    document.querySelectorAll('.time-filter').forEach(filter => {
+        filter.addEventListener('click', () => {
+            document.querySelectorAll('.time-filter').forEach(f => f.classList.remove('active'));
+            filter.classList.add('active');
+            renderProgress();
+        });
+    }); // Close time-filter forEach
+
+    // Drag and drop for active tasks
+    const activeList = document.getElementById('activeTaskList');
+    activeList.addEventListener('dragover', (e) => handleDragOver(e, activeList));
+    activeList.addEventListener('drop', (e) => handleDrop(e, 'active'));
+
+    // Drag and drop for recurring tasks
+    const recurringList = document.getElementById('recurringTaskList');
+    recurringList.addEventListener('dragover', (e) => handleDragOver(e, recurringList));
+    recurringList.addEventListener('drop', (e) => handleDrop(e, 'recurring'));
+
+    // Drag and drop for focus tasks
+    const focusList = document.getElementById('focusTaskList');
+    focusList.addEventListener('dragover', (e) => handleDragOver(e, focusList));
+    focusList.addEventListener('drop', (e) => handleDrop(e, 'focus'));
+
+}
+
+// ============= DRAG AND DROP =============
+
+function handleDragStart(e) {
+    e.dataTransfer.setData('text/plain', e.target.dataset.id);
+    e.target.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragEnd(e) {
+    e.target.classList.remove('dragging');
+}
+
+function handleDragOver(e, container) {
+    e.preventDefault(); // Enable dropping
+    const afterElement = getDragAfterElement(container, e.clientY);
+    const draggingRow = document.querySelector('.task-row.dragging');
+    if (!draggingRow) return;
+
+    // Move the entire wrapper (which contains task-row + subtasks)
+    const draggable = draggingRow.closest('.task-row-wrapper') || draggingRow;
+
+    if (afterElement == null) {
+        container.appendChild(draggable);
+    } else {
+        // Find the wrapper of the afterElement
+        const afterWrapper = afterElement.closest('.task-row-wrapper') || afterElement;
+        container.insertBefore(draggable, afterWrapper);
+    }
+}
+
+async function handleDrop(e, type) {
+    e.preventDefault();
+    const id = e.dataTransfer.getData('text/plain');
+    if (!id) return;
+
+    let container, listVar;
+
+    if (type === 'active') {
+        container = document.getElementById('activeTaskList');
+        listVar = 'tasks';
+    } else if (type === 'recurring') {
+        container = document.getElementById('recurringTaskList');
+        listVar = 'recurringTasks';
+    } else if (type === 'focus') {
+        // Focus section - just reorder focusPinnedIds based on DOM order
+        container = document.getElementById('focusTaskList');
+        const taskRows = Array.from(container.querySelectorAll('.task-row'));
+        appData.focusPinnedIds = taskRows.map(row => row.dataset.id);
+        await saveData();
+        renderTasks();
+        return;
+    } else {
+        return;
+    }
+
+    const taskRows = Array.from(container.querySelectorAll('.task-row'));
+    const newOrderIds = taskRows.map(row => row.dataset.id);
+
+    // Reorder the corresponding array
+    const sourceArray = appData[listVar];
+    const taskMap = new Map(sourceArray.map(t => [t.id, t]));
+    const newTasks = [];
+
+    // 1. Add reordered visible items
+    newOrderIds.forEach(taskId => {
+        if (taskMap.has(taskId)) {
+            newTasks.push(taskMap.get(taskId));
+            taskMap.delete(taskId);
+        }
+    });
+
+    // 2. Append any remaining items (invisible ones or ones not in the DOM list)
+    if (taskMap.size > 0) {
+        for (const task of taskMap.values()) {
+            newTasks.push(task);
+        }
+    }
+
+    appData[listVar] = newTasks;
+    await saveData();
+
+    // Re-render to ensure consistency
+    renderTasks();
+}
+
+function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.task-row:not(.dragging)')];
+
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+// Toggle pin status for a task (add/remove from Focus)
+async function togglePin(taskId) {
+    if (!appData.focusPinnedIds) appData.focusPinnedIds = [];
+
+    const index = appData.focusPinnedIds.indexOf(taskId);
+    if (index > -1) {
+        // Unpin
+        appData.focusPinnedIds.splice(index, 1);
+    } else {
+        // Pin (add to end)
+        appData.focusPinnedIds.push(taskId);
+    }
+
+    await saveData();
+    renderTasks();
+}
+
+// Tab navigation
+function switchTab(tabName) {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById(`${tabName}View`).classList.add('active');
+
+    if (tabName === 'stats') {
+        renderStats();
+    } else if (tabName === 'history') {
+        renderHistory();
+    } else if (tabName === 'progress') {
+        renderProgress();
+    }
+}
+
+// Render all views
+function renderAll() {
+    renderTasks();
+    renderRewards();
+    renderStats();
+    renderHistory();
+    renderProgress();
+    updateCoinDisplay();
+}
+
+// Key Management UI
+function setupKeyManagement() {
+    const modal = document.getElementById('keyModal');
+    const input = document.getElementById('secretKeyInput');
+
+    // Open Modal
+    const openModal = () => {
+        input.value = SECRET_KEY;
+        modal.classList.add('open');
+    };
+
+    document.getElementById('manageKeyBtn').addEventListener('click', openModal);
+    // Listen for the Mobile Nav Tab version of the key button
+    document.getElementById('navKeyBtn')?.addEventListener('click', openModal);
+
+    // Close Modal
+    document.getElementById('closeKeyModal').addEventListener('click', () => {
+        modal.classList.remove('open');
+    });
+    document.getElementById('cancelKeyChange').addEventListener('click', () => {
+        modal.classList.remove('open');
+    });
+
+    // Copy Key
+    document.getElementById('copyKeyBtn').addEventListener('click', () => {
+        input.select();
+        document.execCommand('copy');
+        const btn = document.getElementById('copyKeyBtn');
+        btn.innerHTML = '<i data-lucide="check" class="icon icon-green"></i>';
+        if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [btn] });
+        setTimeout(() => { btn.innerHTML = '<i data-lucide="clipboard-copy" class="icon icon-gray"></i>'; if (typeof lucide !== 'undefined') lucide.createIcons({ nodes: [btn] }); }, 1000);
+    });
+
+    // Save/Load Key
+    document.getElementById('saveKeyChange').addEventListener('click', () => {
+        const newKey = input.value.trim();
+        if (newKey && newKey.length > 3) {
+            localStorage.setItem('brownbook_secret_key', newKey);
+            location.reload(); // Reload to switch user
+        } else {
+            alert("Key is too short!");
+        }
+    });
+
+    // Recover Legacy Data
+    document.getElementById('recoverLegacyBtn')?.addEventListener('click', async () => {
+        if (confirm("⚠️ This will OVERWRITE your current data with the old 'primary_user' backup. Are you sure?")) {
+            try {
+                const legacyDocRef = doc(db, "users", "primary_user");
+                const legacySnap = await getDoc(legacyDocRef);
+
+                if (legacySnap.exists()) {
+                    await setDoc(DATA_DOC_REF, legacySnap.data());
+                    alert("Data recovered! Reloading...");
+                    location.reload();
+                } else {
+                    alert("No legacy data found.");
+                }
+            } catch (error) {
+                console.error("Recovery failed:", error);
+                alert("Recovery failed: " + error.message);
+            }
+        }
+    });
+}
+
+// Update coin display in sidebar
+function updateCoinDisplay() {
+    const balance = appData.stats.currentBalance;
+    console.log("Updating coin display to:", balance);
+    const el = document.querySelector('.coin-amount');
+    if (el) {
+        el.textContent = balance;
+    } else {
+        console.error("Could not find .coin-amount element!");
+    }
+}
+
+
+
+// ============= TASKS =============
+
+// Get today's date for reset (uses configurable reset hour)
+function getTodayDateString() {
+    const now = new Date();
+    // If before reset hour, count as previous day
+    if (now.getHours() < getCurrentResetHour()) {
+        now.setDate(now.getDate() - 1);
+    }
+
+    // Use LOCAL time, not ISO (which is UTC)
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+// Check if a recurring task is completed today
+function isRecurringCompletedToday(taskId) {
+    const today = getTodayDateString();
+    return appData.recurringCompletions[taskId] === today;
+}
+
+// Check if ALL active recurring tasks for today are checked off
+function isAllActiveRecurringTasksCompletedToday() {
+    const todayDate = new Date();
+    if (todayDate.getHours() < getCurrentResetHour()) todayDate.setDate(todayDate.getDate() - 1);
+    
+    // Find all recurring tasks that are supposed to be done today
+    const activeTodayTasks = appData.recurringTasks.filter(t => !t.deleted && isTaskActiveOnDate(t, todayDate));
+    if (activeTodayTasks.length === 0) return false;
+    
+    // Check if every single one is completed
+    return activeTodayTasks.every(t => isRecurringCompletedToday(t.id));
+}
+
+// DST-safe day difference: uses UTC to avoid 23/25-hour day issues
+function daysBetweenDates(startDate, endDate) {
+    const utcStart = Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const utcEnd = Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    return Math.floor((utcEnd - utcStart) / (24 * 60 * 60 * 1000));
+}
+
+// Check if an interval task should show today based on its cycle
+function shouldShowIntervalTask(task) {
+    // If not an interval task (daily or undefined type), always show
+    if (!task.type || task.type === 'daily') {
+        return true;
+    }
+
+    if (task.type !== 'interval' || !task.cycleStartDate) {
+        return true;
+    }
+
+    const now = new Date();
+    // Adjust for 6AM reset
+    if (now.getHours() < getCurrentResetHour()) {
+        now.setDate(now.getDate() - 1);
+    }
+
+    const startDate = new Date(task.cycleStartDate);
+
+    // DST-safe day calculation using UTC
+    const daysSinceStart = daysBetweenDates(startDate, now);
+
+    // Total cycle length
+    const totalCycle = task.activeDays + task.breakDays;
+
+    // Current position in cycle (0-indexed)
+    const dayInCycle = daysSinceStart % totalCycle;
+
+    // Show if within active days (0 to activeDays-1)
+    return dayInCycle < task.activeDays;
+}
+
+function renderTasks() {
+    const today = getTodayDateString();
+
+    // Preserve open subtask containers before re-render
+    const openSubtaskIds = Array.from(document.querySelectorAll('.subtasks-container.open'))
+        .map(el => el.id.replace('subtasks-', ''));
+
+    // Get regular active tasks
+    const activeTasks = appData.tasks.filter(t => !t.completed);
+
+    // Get today's completed tasks (completed after 6AM today, excluding recurring - those use recurringCompleted)
+    const todayCompletedTasks = appData.completedHistory.filter(t => {
+        if (!t.completedAt) return false;
+        if (t.isRecurring) return false; // Skip recurring entries, they're shown from recurringCompleted
+        const completedDate = new Date(t.completedAt);
+        // Check if completed after 6AM today
+        const todayStart = new Date(today + 'T' + String(getCurrentResetHour()).padStart(2, '0') + ':00:00');
+        return completedDate >= todayStart;
+    });
+
+    // Filter recurring tasks - only show those active today (handles interval logic and suspensions)
+    const now = new Date();
+    if (now.getHours() < getCurrentResetHour()) {
+        now.setDate(now.getDate() - 1);
+    }
+    
+    // Split into active, completed, and suspended
+    const suspendedTasks = appData.recurringTasks.filter(t => !t.deleted && isTaskSuspendedOnDate(t, now));
+    const visibleRecurringTasks = appData.recurringTasks.filter(t => !t.deleted && !isTaskSuspendedOnDate(t, now) && isTaskActiveOnDate(t, now));
+
+    // Separate visible recurring tasks into completed and not completed for today
+    const recurringNotCompleted = visibleRecurringTasks.filter(t => !isRecurringCompletedToday(t.id));
+    const recurringCompleted = visibleRecurringTasks.filter(t => isRecurringCompletedToday(t.id));
+
+    // Update count (recurring not completed + regular active)
+    const totalRemaining = recurringNotCompleted.length + activeTasks.length;
+    document.getElementById('taskCount').textContent =
+        totalRemaining === 1
+            ? '1 task remaining'
+            : `${totalRemaining} tasks remaining`;
+
+    // Vacation banner
+    const vacationBanner = document.getElementById('vacationBanner');
+    if (vacationBanner) {
+        vacationBanner.style.display = isVacationDay(today) ? 'flex' : 'none';
+    }
+
+    // Show/hide sections
+    const hasRecurring = recurringNotCompleted.length > 0;
+    const hasActive = activeTasks.length > 0;
+    const hasTodayCompleted = todayCompletedTasks.length > 0 || recurringCompleted.length > 0;
+    const hasSuspended = suspendedTasks.length > 0;
+    const isEmpty = !hasRecurring && !hasActive && !hasTodayCompleted && !hasSuspended;
+
+    document.getElementById('tasksEmpty').style.display = isEmpty ? 'block' : 'none';
+    document.getElementById('recurringTasks').style.display = hasRecurring ? 'block' : 'none';
+    document.getElementById('activeTasks').style.display = hasActive ? 'block' : 'none';
+    document.getElementById('todayCompletedTasks').style.display = hasTodayCompleted ? 'block' : 'none';
+    document.getElementById('suspendedTasksSection').style.display = hasSuspended ? 'block' : 'none';
+
+    // Render suspended tasks
+    if (hasSuspended) {
+        document.getElementById('suspendedCount').textContent = suspendedTasks.length;
+        document.getElementById('suspendedTaskList').innerHTML = suspendedTasks.map(task => {
+            const diff = DIFFICULTIES[task.difficulty || 'medium'];
+            return `
+                <div class="task-row recurring-row" data-id="${task.id}" data-type="recurring">
+                    <div class="task-checkbox recurring ${task.difficulty}">
+                        <i data-lucide="pause-circle" class="icon icon-gray" style="width:14px;height:14px;"></i>
+                    </div>
+                    <div class="task-content">
+                        <div class="task-title" style="color: #888;">${escapeHtml(task.title)}</div>
+                    </div>
+                    <button class="btn-resume" onclick="unsuspendTask('${task.id}')">Resume</button>
+                </div>
+            `;
+        }).join('');
+        lucide.createIcons();
+    }
+
+    // ============= FOCUS SECTION =============
+    // Ensure focusPinnedIds exists
+    if (!appData.focusPinnedIds) appData.focusPinnedIds = [];
+
+    // Build focus tasks from pinned IDs (preserve order)
+    const focusTasks = [];
+    appData.focusPinnedIds.forEach(id => {
+        // Check if it's a regular task
+        const task = activeTasks.find(t => t.id === id);
+        if (task) {
+            focusTasks.push({ task, type: 'task' });
+            return;
+        }
+        // Check if it's a recurring task (and not completed today)
+        const recurring = recurringNotCompleted.find(t => t.id === id);
+        if (recurring) {
+            focusTasks.push({ task: recurring, type: 'recurring' });
+        }
+    });
+
+    // Clean up stale pinned IDs (tasks that no longer exist or are completed)
+    const validPinnedIds = focusTasks.map(f => f.task.id);
+    if (validPinnedIds.length !== appData.focusPinnedIds.length) {
+        appData.focusPinnedIds = validPinnedIds;
+        saveData(); // Async, fire and forget
+    }
+
+    const hasFocus = focusTasks.length > 0;
+    document.getElementById('focusTasks').style.display = hasFocus ? 'block' : 'none';
+
+    // Render Focus section
+    document.getElementById('focusTaskList').innerHTML = focusTasks.map(f => {
+        if (f.type === 'recurring') {
+            return createRecurringTaskRow(f.task, false, true);
+        } else {
+            return createTaskRow(f.task, false, true);
+        }
+    }).join('');
+
+    // Filter out pinned tasks from original sections (they only show in Focus)
+    const unpinnedRecurring = recurringNotCompleted.filter(t => !validPinnedIds.includes(t.id));
+    const unpinnedActive = activeTasks.filter(t => !validPinnedIds.includes(t.id));
+
+    // Render only non-completed, unpinned recurring tasks in Recurring section
+    document.getElementById('recurringTaskList').innerHTML = unpinnedRecurring.map(task =>
+        createRecurringTaskRow(task, false)
+    ).join('');
+
+    // Render active regular tasks (excluding pinned)
+    document.getElementById('activeTaskList').innerHTML = unpinnedActive.map(task =>
+        createTaskRow(task, false)
+    ).join('');
+
+    // Update section visibility based on unpinned counts
+    document.getElementById('recurringTasks').style.display = unpinnedRecurring.length > 0 ? 'block' : 'none';
+    document.getElementById('activeTasks').style.display = unpinnedActive.length > 0 ? 'block' : 'none';
+
+    // Render today's completed (both regular tasks and completed recurring tasks)
+    let todayCompletedHTML = recurringCompleted.map(task =>
+        createRecurringTaskRow(task, true)
+    ).join('');
+    todayCompletedHTML += todayCompletedTasks.map(task =>
+        createTaskRow(task, true)
+    ).join('');
+    document.getElementById('todayCompletedTaskList').innerHTML = todayCompletedHTML;
+
+    // Update recurring streak badge
+    const streak = calculateRecurringStreak();
+    const streakBadge = document.getElementById('recurringStreakBadge');
+    if (streakBadge) {
+        streakBadge.innerHTML = streak > 0 ? `<i data-lucide="flame" class="icon icon-orange" style="width:12px;height:12px;"></i> ${streak}` : '';
+        streakBadge.style.display = streak > 0 ? 'inline' : 'none';
+    }
+
+    // Add event listeners
+    document.querySelectorAll('.task-checkbox:not(.recurring):not(.completed-task)').forEach(cb => {
+        cb.addEventListener('click', () => toggleTask(cb.dataset.id));
+    });
+
+    document.querySelectorAll('.task-checkbox.completed-task').forEach(cb => {
+        cb.addEventListener('click', () => uncompleteTask(cb.dataset.id));
+    });
+
+    document.querySelectorAll('.task-checkbox.recurring').forEach(cb => {
+        cb.addEventListener('click', () => toggleRecurringTask(cb.dataset.id));
+    });
+
+    document.querySelectorAll('.task-delete').forEach(btn => {
+        btn.addEventListener('click', () => deleteTask(btn.dataset.id));
+    });
+
+    document.querySelectorAll('.recurring-delete').forEach(btn => {
+        btn.addEventListener('click', () => deleteRecurringTask(btn.dataset.id));
+    });
+
+    document.querySelectorAll('.recurring-suspend').forEach(btn => {
+        btn.addEventListener('click', () => openSuspendModal(btn.dataset.id));
+    });
+
+    // Pin button listeners
+    document.querySelectorAll('.task-pin').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            togglePin(btn.dataset.id);
+        });
+    });
+
+    // Drag listeners for active tasks
+    document.querySelectorAll('.task-row[draggable="true"]').forEach(row => {
+        row.addEventListener('dragstart', handleDragStart);
+        row.addEventListener('dragend', handleDragEnd);
+    });
+
+    // Subtask expand/collapse button listeners
+    document.querySelectorAll('.task-expand-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const taskId = btn.dataset.expandId;
+            const container = document.getElementById(`subtasks-${taskId}`);
+            if (container) {
+                container.classList.toggle('open');
+                btn.classList.toggle('expanded');
+            }
+        });
+    });
+
+    // Subtask checkbox listeners
+    document.querySelectorAll('.subtask-checkbox').forEach(cb => {
+        cb.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const parentId = cb.dataset.parentId;
+            const subtaskId = cb.dataset.subtaskId;
+            const taskType = cb.dataset.taskType;
+            if (parentId && subtaskId) {
+                toggleSubtask(e, parentId, subtaskId, taskType);
+            }
+        });
+    });
+
+    // Restore previously open subtask containers
+    openSubtaskIds.forEach(taskId => {
+        const container = document.getElementById(`subtasks-${taskId}`);
+        const btn = document.querySelector(`.task-expand-btn[data-expand-id="${taskId}"]`);
+        if (container) {
+            container.classList.add('open');
+        }
+        if (btn) {
+            btn.classList.add('expanded');
+        }
+    });
+
+    // Inline add subtask button listeners
+    document.querySelectorAll('.inline-subtask-add').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const parentId = btn.dataset.parentId;
+            const taskType = btn.dataset.taskType;
+            const input = btn.previousElementSibling;
+            if (input && input.value.trim()) {
+                addSubtaskToExisting(parentId, taskType, input.value.trim());
+                input.value = '';
+            }
+        });
+    });
+
+    // Inline add subtask input enter key listeners
+    document.querySelectorAll('.inline-subtask-input').forEach(input => {
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.stopPropagation();
+                const parentId = input.dataset.parentId;
+                const taskType = input.dataset.taskType;
+                if (input.value.trim()) {
+                    addSubtaskToExisting(parentId, taskType, input.value.trim());
+                    input.value = '';
+                }
+            }
+        });
+        // Prevent click from closing dropdown
+        input.addEventListener('click', (e) => e.stopPropagation());
+    });
+
+    // Subtask delete button listeners
+    document.querySelectorAll('.subtask-delete').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const parentId = btn.dataset.parentId;
+            const subtaskId = btn.dataset.subtaskId;
+            const taskType = btn.dataset.taskType;
+            if (parentId && subtaskId) {
+                deleteSubtask(parentId, subtaskId, taskType);
+            }
+        });
+    });
+
+    // Initialize Lucide icons for dynamically rendered content
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function createTaskRow(task, isCompleted, inFocusSection = false) {
+    const diff = DIFFICULTIES[task.difficulty];
+    const isPinned = appData.focusPinnedIds && appData.focusPinnedIds.includes(task.id);
+    const pinIcon = `<i data-lucide="${isPinned ? 'pin-off' : 'pin'}" class="icon ${isPinned ? 'icon-orange' : 'icon-gray'}" style="width:14px;height:14px;"></i>`;
+
+    // Calculate expiration timer if applicable
+    let expiryHtml = '';
+    if (task.expiresAt && !isCompleted) {
+        const timeLeft = getTimeRemaining(task.expiresAt);
+        const isUrgent = timeLeft.totalMs < 2 * 60 * 60 * 1000; // < 2 hours
+        expiryHtml = `<span class="task-expiry ${isUrgent ? 'urgent' : ''}">${timeLeft.display}</span>`;
+    }
+
+    // Pin button (only show for active tasks, not completed)
+    const pinBtn = !isCompleted ? `<button class="task-pin ${isPinned ? 'pinned' : ''}" data-id="${task.id}" data-type="task">${pinIcon}</button>` : '';
+
+    // Subtasks HTML - always show expand button for active tasks (to allow adding subtasks)
+    let subtasksHtml = '';
+    let expandBtn = '';
+    let progressHtml = '';
+
+    // Calculate progress for tasks with subtasks
+    const subtaskCount = (task.subtasks || []).length;
+    const completedCount = (task.subtasks || []).filter(s => s.completed).length;
+    if (subtaskCount > 0) {
+        const progressPercent = Math.round((completedCount / subtaskCount) * 100);
+        progressHtml = `
+            <div class="subtask-progress">
+                <div class="subtask-progress-track">
+                    <div class="subtask-progress-bar" style="width: ${progressPercent}%"></div>
+                </div>
+                <span class="subtask-progress-text">${completedCount}/${subtaskCount} (${progressPercent}%)</span>
+            </div>
+        `;
+    }
+
+    if (!isCompleted) {
+        expandBtn = `<button class="task-expand-btn" data-expand-id="${task.id}">▶</button>`;
+
+        const subtaskRows = (task.subtasks || []).map(st => {
+            const stCompleted = st.completed ? 'completed' : '';
+            const coinsHtml = task.distributeCoins ? `<span class="subtask-coins">+${st.coins}</span>` : '';
+            return `
+                <div class="subtask-row ${stCompleted}" data-id="${st.id}">
+                    <div class="subtask-checkbox ${stCompleted}" data-parent-id="${task.id}" data-subtask-id="${st.id}" data-task-type="task">
+                        ${st.completed ? '✓' : ''}
+                    </div>
+                    <span class="subtask-title">${escapeHtml(st.title)}</span>
+                    ${coinsHtml}
+                    <button class="subtask-delete" data-parent-id="${task.id}" data-subtask-id="${st.id}" data-task-type="task">×</button>
+                </div>
+            `;
+        }).join('');
+
+        // Add inline form for adding new subtasks
+        const addSubtaskForm = `
+            <div class="add-subtask-inline">
+                <input type="text" class="inline-subtask-input" placeholder="New subtask..." data-parent-id="${task.id}" data-task-type="task">
+                <button class="inline-subtask-add" data-parent-id="${task.id}" data-task-type="task">+</button>
+            </div>
+        `;
+
+        subtasksHtml = `<div class="subtasks-container" id="subtasks-${task.id}">${subtaskRows}${addSubtaskForm}</div>`;
+    } else if (task.subtasks && task.subtasks.length > 0) {
+        // For completed tasks, just show subtasks (no add form)
+        expandBtn = `<button class="task-expand-btn" data-expand-id="${task.id}">▶</button>`;
+        const subtaskRows = task.subtasks.map(st => {
+            return `
+                <div class="subtask-row completed" data-id="${st.id}">
+                    <div class="subtask-checkbox completed">✓</div>
+                    <span class="subtask-title">${escapeHtml(st.title)}</span>
+                </div>
+            `;
+        }).join('');
+        subtasksHtml = `<div class="subtasks-container" id="subtasks-${task.id}">${subtaskRows}</div>`;
+    }
+
+    return `
+        <div class="task-row-wrapper">
+            <div class="task-row ${isCompleted ? 'completed' : ''} ${inFocusSection ? 'in-focus' : ''}" data-id="${task.id}" data-type="task" draggable="${!isCompleted}">
+                ${expandBtn}
+                <div class="task-checkbox ${isCompleted ? 'completed-task' : ''} ${task.difficulty} ${isCompleted ? 'checked' : ''}" data-id="${task.id}">
+                    ${isCompleted ? '✓' : ''}
+                </div>
+                <div class="task-content">
+                    <div class="task-title">${escapeHtml(task.title)}</div>
+                    ${task.notes ? `<div class="task-notes">${escapeHtml(task.notes)}</div>` : ''}
+                    ${progressHtml}
+                </div>
+                ${expiryHtml}
+                <div class="task-coins ${task.difficulty}">
+                    ${diff.emoji} ${diff.coins}
+                </div>
+                ${pinBtn}
+                ${!isCompleted ? `<button class="task-delete" data-id="${task.id}"><i data-lucide="trash-2" class="icon icon-red"></i></button>` : ''}
+            </div>
+            ${subtasksHtml}
+        </div>
+    `;
+}
+
+// Helper: Calculate time remaining until expiration
+function getTimeRemaining(expiresAt) {
+    const diff = new Date(expiresAt) - new Date();
+    if (diff <= 0) {
+        return { display: 'Expired', totalMs: 0 };
+    }
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (hours >= 24) {
+        const days = Math.floor(hours / 24);
+        return { display: `⏱ ${days}d ${hours % 24}h`, totalMs: diff };
+    }
+    return { display: `⏱ ${hours}h ${minutes}m`, totalMs: diff };
+}
+
+function createRecurringTaskRow(task, isCompleted, inFocusSection = false) {
+    const diff = DIFFICULTIES[task.difficulty];
+    const isPinned = appData.focusPinnedIds && appData.focusPinnedIds.includes(task.id);
+    const pinIcon = `<i data-lucide="${isPinned ? 'pin-off' : 'pin'}" class="icon ${isPinned ? 'icon-orange' : 'icon-gray'}" style="width:14px;height:14px;"></i>`;
+
+    // Pin button (only show for active recurring tasks, not completed)
+    const pinBtn = !isCompleted ? `<button class="task-pin ${isPinned ? 'pinned' : ''}" data-id="${task.id}" data-type="recurring">${pinIcon}</button>` : '';
+
+    // Subtasks HTML - always show expand button for active tasks (to allow adding subtasks)
+    let subtasksHtml = '';
+    let expandBtn = '';
+    let progressHtml = '';
+
+    // Calculate progress for tasks with subtasks
+    const subtaskCount = (task.subtasks || []).length;
+    const completedCount = (task.subtasks || []).filter(s => s.completed).length;
+    if (subtaskCount > 0) {
+        const progressPercent = Math.round((completedCount / subtaskCount) * 100);
+        progressHtml = `
+            <div class="subtask-progress">
+                <div class="subtask-progress-track">
+                    <div class="subtask-progress-bar" style="width: ${progressPercent}%"></div>
+                </div>
+                <span class="subtask-progress-text">${completedCount}/${subtaskCount} (${progressPercent}%)</span>
+            </div>
+        `;
+    }
+
+    if (!isCompleted) {
+        expandBtn = `<button class="task-expand-btn" data-expand-id="${task.id}">▶</button>`;
+
+        const subtaskRows = (task.subtasks || []).map(st => {
+            const stCompleted = st.completed ? 'completed' : '';
+            const coinsHtml = task.distributeCoins ? `<span class="subtask-coins">+${st.coins}</span>` : '';
+            return `
+                <div class="subtask-row ${stCompleted}" data-id="${st.id}">
+                    <div class="subtask-checkbox ${stCompleted}" data-parent-id="${task.id}" data-subtask-id="${st.id}" data-task-type="recurring">
+                        ${st.completed ? '✓' : ''}
+                    </div>
+                    <span class="subtask-title">${escapeHtml(st.title)}</span>
+                    ${coinsHtml}
+                    <button class="subtask-delete" data-parent-id="${task.id}" data-subtask-id="${st.id}" data-task-type="recurring">×</button>
+                </div>
+            `;
+        }).join('');
+
+        // Add inline form for adding new subtasks
+        const addSubtaskForm = `
+            <div class="add-subtask-inline">
+                <input type="text" class="inline-subtask-input" placeholder="New subtask..." data-parent-id="${task.id}" data-task-type="recurring">
+                <button class="inline-subtask-add" data-parent-id="${task.id}" data-task-type="recurring">+</button>
+            </div>
+        `;
+
+        subtasksHtml = `<div class="subtasks-container" id="subtasks-${task.id}">${subtaskRows}${addSubtaskForm}</div>`;
+    } else if (task.subtasks && task.subtasks.length > 0) {
+        // For completed tasks, just show subtasks (no add form)
+        expandBtn = `<button class="task-expand-btn" data-expand-id="${task.id}">▶</button>`;
+        const subtaskRows = task.subtasks.map(st => {
+            return `
+                <div class="subtask-row completed" data-id="${st.id}">
+                    <div class="subtask-checkbox completed">✓</div>
+                    <span class="subtask-title">${escapeHtml(st.title)}</span>
+                </div>
+            `;
+        }).join('');
+        subtasksHtml = `<div class="subtasks-container" id="subtasks-${task.id}">${subtaskRows}</div>`;
+    }
+
+    return `
+        <div class="task-row-wrapper">
+            <div class="task-row recurring-row ${isCompleted ? 'completed' : ''} ${inFocusSection ? 'in-focus' : ''}" data-id="${task.id}" data-type="recurring" draggable="${!isCompleted}">
+                ${expandBtn}
+                <div class="task-checkbox recurring ${task.difficulty} ${isCompleted ? 'checked' : ''}" data-id="${task.id}">
+                    ${isCompleted ? '✓' : '<i data-lucide="repeat-2" class="icon icon-teal" style="width:14px;height:14px;"></i>'}
+                </div>
+                <div class="task-content">
+                    <div class="task-title">${escapeHtml(task.title)}</div>
+                    ${task.notes ? `<div class="task-notes">${escapeHtml(task.notes)}</div>` : ''}
+                    ${progressHtml}
+                </div>
+                <div class="task-coins ${task.difficulty}">
+                    ${diff.emoji} ${diff.coins}
+                </div>
+                ${pinBtn}
+                <button class="recurring-suspend" data-id="${task.id}"><i data-lucide="pause-circle" class="icon icon-teal"></i></button>
+                <button class="recurring-delete" data-id="${task.id}"><i data-lucide="trash-2" class="icon icon-red"></i></button>
+            </div>
+            ${subtasksHtml}
+        </div>
+    `;
+}
+
+function openAddTaskModal() {
+    document.getElementById('addTaskModal').classList.add('open');
+    document.getElementById('taskTitle').value = '';
+    document.getElementById('taskNotes').value = '';
+    document.getElementById('recurringTaskToggle').checked = false;
+    document.getElementById('recurringOptions').style.display = 'none';
+    document.getElementById('intervalSettings').style.display = 'none';
+    document.getElementById('expirationOptions').style.display = 'block'; // Show expiration for non-recurring
+    document.getElementById('taskExpiration').value = ''; // Reset to no expiration
+    document.getElementById('customExpirationDT').style.display = 'none'; // Hide custom picker
+    document.getElementById('customExpirationDT').value = ''; // Clear custom value
+    document.querySelector('input[name="recurrenceType"][value="daily"]').checked = true;
+    document.getElementById('activeDaysInput').value = '3';
+    document.getElementById('breakDaysInput').value = '1';
+    document.getElementById('cycleStartSelect').value = '0';
+
+    // Sub-tasks reset
+    document.getElementById('distributeCoinsToggle').checked = false;
+    document.getElementById('subtaskListInput').innerHTML = '';
+    document.getElementById('subtaskValidationMsg').style.display = 'none';
+
+    document.querySelector('.diff-btn[data-difficulty="placeholder"]').style.display = '';
+
+    selectDifficulty(document.querySelector('.diff-btn[data-difficulty="medium"]'));
+    document.getElementById('taskTitle').focus();
+}
+
+function closeAddTaskModal() {
+    document.getElementById('addTaskModal').classList.remove('open');
+}
+
+function selectDifficulty(btn) {
+    document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+
+    const diffName = btn.dataset.difficulty;
+    const diff = DIFFICULTIES[diffName];
+    document.getElementById('timeEstimate').textContent = diff.time;
+    document.getElementById('coinReward').textContent = diff.coins;
+
+    const recurringToggle = document.getElementById('recurringTaskToggle');
+    if (diffName === 'placeholder') {
+        recurringToggle.checked = false;
+        recurringToggle.disabled = true;
+        document.getElementById('recurringOptions').style.display = 'none';
+        document.getElementById('expirationOptions').style.display = 'block';
+    } else {
+        recurringToggle.disabled = false;
+    }
+}
+
+function saveNewTask() {
+    const title = document.getElementById('taskTitle').value.trim();
+    if (!title) return;
+
+    const difficulty = document.querySelector('.diff-btn.selected').dataset.difficulty;
+    const notes = document.getElementById('taskNotes').value.trim();
+    const isRecurring = document.getElementById('recurringTaskToggle').checked;
+
+    // Subtasks parsing
+    const subtaskInputs = document.querySelectorAll('.subtask-input-row');
+    const distributeCoins = document.getElementById('distributeCoinsToggle').checked;
+    const subtasks = [];
+    let subtaskTotalCoins = 0;
+
+    subtaskInputs.forEach(row => {
+        const titleInput = row.querySelector('input[type="text"]');
+        const coinInput = row.querySelector('input[type="number"]');
+        const sTitle = titleInput.value.trim();
+        if (sTitle) {
+            const sCoins = distributeCoins ? (parseInt(coinInput.value) || 0) : 0;
+            subtasks.push({
+                id: 'sub_' + Date.now() + Math.random().toString(36).substr(2, 5),
+                title: sTitle,
+                completed: false,
+                coins: sCoins
+            });
+            subtaskTotalCoins += sCoins;
+        }
+    });
+
+    const selectedDifficultyBtn = document.querySelector('.diff-btn.selected');
+    const difficultyCoins = parseInt(selectedDifficultyBtn.dataset.coins);
+
+    // Validation for distributed coins
+    if (distributeCoins && subtasks.length > 0) {
+        if (subtaskTotalCoins !== difficultyCoins) {
+            alert(`Error: Subtask coins total (${subtaskTotalCoins}) must equal main task reward (${difficultyCoins}).`);
+            return;
+        }
+    }
+
+    if (isRecurring) {
+        const recurrenceType = document.querySelector('input[name="recurrenceType"]:checked').value;
+
+        // Create recurring task
+        const recurringTask = {
+            id: 'custom_' + Date.now().toString(),
+            title,
+            notes,
+            subtasks,
+            distributeCoins,
+            difficulty,
+            type: recurrenceType, // 'daily' or 'interval'
+            createdAt: new Date().toISOString()
+        };
+
+        // Add interval-specific properties
+        if (recurrenceType === 'interval') {
+            recurringTask.activeDays = parseInt(document.getElementById('activeDaysInput').value) || 3;
+            recurringTask.breakDays = parseInt(document.getElementById('breakDaysInput').value) || 1;
+
+            // Calculate cycle start date based on dropdown
+            const daysAgo = parseInt(document.getElementById('cycleStartSelect').value) || 0;
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - daysAgo);
+            // Set to 6AM to match reset time
+            startDate.setHours(getCurrentResetHour(), 0, 0, 0);
+            recurringTask.cycleStartDate = startDate.toISOString();
+        }
+
+        appData.recurringTasks.push(recurringTask);
+    } else {
+        // Create regular task
+        const task = {
+            id: Date.now().toString(),
+            title,
+            notes,
+            subtasks,
+            distributeCoins,
+            difficulty,
+            completed: false,
+            createdAt: new Date().toISOString()
+        };
+
+        // Handle expiration
+        const expirationDays = document.getElementById('taskExpiration').value;
+        if (expirationDays === 'custom') {
+            // Use custom datetime picker value
+            const customDT = document.getElementById('customExpirationDT').value;
+            if (customDT) {
+                task.expiresAt = new Date(customDT).toISOString();
+            }
+        } else if (expirationDays !== '') {
+            // Use preset (next reset hour + days)
+            const now = new Date();
+            let next6AM = new Date(now);
+            next6AM.setHours(getCurrentResetHour(), 0, 0, 0);
+            // If already past reset hour today, next reset is tomorrow
+            if (now.getHours() >= getCurrentResetHour()) {
+                next6AM.setDate(next6AM.getDate() + 1);
+            }
+            // Add the offset days
+            next6AM.setDate(next6AM.getDate() + parseInt(expirationDays));
+            task.expiresAt = next6AM.toISOString();
+        }
+
+        appData.tasks.unshift(task);
+    }
+
+    saveData();
+    renderTasks();
+    closeAddTaskModal();
+}
+
+function toggleTask(id) {
+    const taskIndex = appData.tasks.findIndex(t => t.id === id);
+    if (taskIndex === -1) return;
+
+    const task = appData.tasks[taskIndex];
+
+    if (task.difficulty === 'placeholder') {
+        // Just permanently delete it, no coins, no history
+        appData.tasks.splice(taskIndex, 1);
+        appData.focusPinnedIds = appData.focusPinnedIds.filter(id => id !== task.id);
+        saveData();
+        renderTasks();
+        if (typeof renderFocus === 'function') renderFocus();
+        return;
+    }
+
+    // Complete the task - add coins and move to history
+    task.completed = true;
+    task.completedAt = new Date().toISOString();
+    const coins = DIFFICULTIES[task.difficulty].coins;
+    appData.stats.totalCoinsEarned += coins;
+    appData.stats.currentBalance += coins;
+    incrementTaskCount(task.difficulty);
+
+    // Move to completed history
+    appData.completedHistory.unshift(task);
+    appData.tasks.splice(taskIndex, 1);
+
+    // Show coin animation
+    showCoinPopup(id, coins);
+
+    saveData();
+    renderTasks();
+    renderHistory();
+    updateCoinDisplay();
+    if (typeof renderFocus === 'function') renderFocus();
+}
+
+function uncompleteTask(id) {
+    // Find task in completedHistory
+    const taskIndex = appData.completedHistory.findIndex(t => t.id === id);
+    if (taskIndex === -1) return;
+
+    const task = appData.completedHistory[taskIndex];
+
+    // Remove coins
+    const coins = DIFFICULTIES[task.difficulty].coins;
+    appData.stats.totalCoinsEarned -= coins;
+    appData.stats.currentBalance -= coins;
+    decrementTaskCount(task.difficulty);
+
+    // Mark as not completed and move back to tasks
+    task.completed = false;
+    delete task.completedAt;
+    appData.tasks.unshift(task);
+    appData.completedHistory.splice(taskIndex, 1);
+
+    saveData();
+    renderTasks();
+    renderHistory();
+    updateCoinDisplay();
+}
+
+function toggleRecurringTask(id) {
+    const task = appData.recurringTasks.find(t => t.id === id);
+    if (!task) return;
+
+    const today = getTodayDateString();
+    const isCompleted = isRecurringCompletedToday(id);
+
+    if (isCompleted) {
+        // Uncomplete - remove coins and clear completion
+        const coins = DIFFICULTIES[task.difficulty].coins;
+        appData.stats.totalCoinsEarned -= coins;
+        appData.stats.currentBalance -= coins;
+        decrementTaskCount(task.difficulty);
+        delete appData.recurringCompletions[id];
+
+        // Remove from completedHistory (find today's entry for this recurring task)
+        const historyIndex = appData.completedHistory.findIndex(t => {
+            if (t.recurringId !== id || !t.completedAt) return false;
+
+            // Convert history timestamp to "App Date" (Local + 6AM offset)
+            const date = new Date(t.completedAt);
+            if (date.getHours() < getResetHourForTimestamp(date)) date.setDate(date.getDate() - 1);
+
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hDate = `${year}-${month}-${day}`;
+
+            return hDate === today;
+        });
+
+        if (historyIndex !== -1) {
+            appData.completedHistory.splice(historyIndex, 1);
+        }
+    } else {
+        // Complete - add coins and mark completion
+        const coins = DIFFICULTIES[task.difficulty].coins;
+        appData.stats.totalCoinsEarned += coins;
+        appData.stats.currentBalance += coins;
+        incrementTaskCount(task.difficulty);
+        appData.recurringCompletions[id] = today;
+
+        // Check if this completion finished the whole daily list - award Early Bird Bonus
+        if (isAllActiveRecurringTasksCompletedToday()) {
+            awardEarlyBirdBonus(id);
+        }
+
+        // Log to completedHistory for permanent record
+        appData.completedHistory.unshift({
+            id: 'recurring_' + id + '_' + Date.now(),
+            recurringId: id,
+            title: task.title,
+            notes: task.notes,
+            difficulty: task.difficulty,
+            isRecurring: true,
+            completed: true,
+            completedAt: new Date().toISOString()
+        });
+
+        // Show coin animation
+        showCoinPopup(id, coins);
+    }
+
+    saveData();
+    renderTasks();
+    renderHistory();
+    updateCoinDisplay();
+}
+
+async function deleteRecurringTask(id) {
+    const task = appData.recurringTasks.find(t => t.id === id);
+    const taskName = task ? task.title : 'this task';
+    const confirmed = await showDeleteConfirmation(`Are you sure you want to delete "${taskName}"? This cannot be undone.`);
+    if (!confirmed) return;
+
+    // Soft delete: mark as deleted instead of removing, so history is preserved in progress
+    if (task) {
+        task.deleted = true;
+        task.deletedAt = new Date().toISOString();
+    }
+    // Clear today's completion checkbox state
+    delete appData.recurringCompletions[id];
+    // Remove from focus pins if pinned
+    if (appData.focusPinnedIds) {
+        appData.focusPinnedIds = appData.focusPinnedIds.filter(pid => pid !== id);
+    }
+    saveData();
+    renderTasks();
+}
+
+function openSuspendModal(taskId) {
+    currentSuspendTaskId = taskId;
+    document.getElementById('suspendTaskModal').classList.add('open');
+    document.getElementById('suspendDaysInput').value = '7';
+    document.getElementById('suspendDateInput').value = '';
+    document.querySelector('input[name="suspendType"][value="days"]').checked = true;
+    document.getElementById('suspendDaysContainer').style.display = 'flex';
+    document.getElementById('suspendDateContainer').style.display = 'none';
+}
+
+function closeSuspendModal() {
+    document.getElementById('suspendTaskModal').classList.remove('open');
+    currentSuspendTaskId = null;
+}
+
+function handleSuspendConfirm() {
+    if (!currentSuspendTaskId) return;
+    
+    const type = document.querySelector('input[name="suspendType"]:checked').value;
+    let endDate = null;
+    
+    if (type === 'days') {
+        const days = parseInt(document.getElementById('suspendDaysInput').value) || 0;
+        if (days > 0) {
+            const date = new Date();
+            date.setDate(date.getDate() + days);
+            endDate = date.toISOString();
+        }
+    } else if (type === 'date') {
+        const dateVal = document.getElementById('suspendDateInput').value;
+        if (dateVal) {
+            const date = new Date(dateVal);
+            date.setHours(23, 59, 59, 999);
+            endDate = date.toISOString();
+        }
+    }
+    
+    suspendTask(currentSuspendTaskId, endDate);
+    closeSuspendModal();
+}
+
+function suspendTask(id, endDate) {
+    const task = appData.recurringTasks.find(t => t.id === id);
+    if (!task) return;
+    
+    if (!task.suspensions) task.suspensions = [];
+    task.suspensions.push({
+        start: new Date().toISOString(),
+        end: endDate // null means indefinite
+    });
+    
+    saveData();
+    renderTasks();
+}
+
+window.unsuspendTask = function(id) {
+    const task = appData.recurringTasks.find(t => t.id === id);
+    if (!task || !task.suspensions || task.suspensions.length === 0) return;
+    
+    const lastSuspension = task.suspensions[task.suspensions.length - 1];
+    if (!lastSuspension.end || new Date(lastSuspension.end) > new Date()) {
+        lastSuspension.end = new Date().toISOString();
+    }
+    
+    saveData();
+    renderTasks();
+}
+
+function showCoinPopup(taskId, coins) {
+    const row = document.querySelector(`.task-row[data-id="${taskId}"]`);
+    if (!row) return;
+
+    row.style.position = 'relative';
+    const popup = document.createElement('div');
+    popup.className = 'coins-popup';
+    popup.textContent = `+${coins}`;
+    row.appendChild(popup);
+
+    setTimeout(() => popup.remove(), 800);
+}
+
+// Calculate and award the Early Bird Daily Bonus
+function awardEarlyBirdBonus(lastTaskId) {
+    const todayStr = getTodayDateString();
+    if (appData.stats.lastEarlyBirdBonusDate === todayStr) return; // Already awarded today
+
+    const todayDate = new Date();
+    if (todayDate.getHours() < getCurrentResetHour()) todayDate.setDate(todayDate.getDate() - 1);
+    
+    // Get all tasks active for today
+    const activeTodayTasks = appData.recurringTasks.filter(t => !t.deleted && isTaskActiveOnDate(t, todayDate));
+    if (activeTodayTasks.length === 0) return;
+    
+    // Sum their base coins
+    let totalBaseCoins = 0;
+    activeTodayTasks.forEach(t => {
+        totalBaseCoins += DIFFICULTIES[t.difficulty].coins;
+    });
+
+    const now = new Date();
+    const hour = now.getHours();
+    let multiplier = 0;
+
+    // Evaluate tiers (before 9 PM = +50%, before 10 PM = +25%)
+    if (hour >= getCurrentResetHour() && hour < 21) {
+        multiplier = 0.5; // Tier 1: 1.5x total payout (50% bonus)
+    } else if (hour >= 21 && hour < 22) {
+        multiplier = 0.25; // Tier 2: 1.25x total payout (25% bonus)
+    }
+
+    if (multiplier > 0) {
+        const bonusCoins = Math.ceil(totalBaseCoins * multiplier);
+        appData.stats.totalCoinsEarned += bonusCoins;
+        appData.stats.currentBalance += bonusCoins;
+        appData.stats.lastEarlyBirdBonusDate = todayStr;
+
+        // Delay popup slightly so it appears after the regular coin popup
+        setTimeout(() => showEarlyBirdPopup(lastTaskId, bonusCoins), 300);
+    }
+}
+
+function showEarlyBirdPopup(taskId, coins) {
+    const row = document.querySelector(`.task-row[data-id="${taskId}"]`);
+    if (!row) return;
+
+    row.style.position = 'relative';
+    const popup = document.createElement('div');
+    popup.className = 'coins-popup early-bird';
+    popup.innerHTML = `+${coins} <span>Early Bird!</span>`;
+    row.appendChild(popup);
+
+    setTimeout(() => popup.remove(), 1200);
+}
+
+function incrementTaskCount(difficulty) {
+    const key = `tasksCompleted${difficulty.charAt(0).toUpperCase()}${difficulty.slice(1)}`;
+    appData.stats[key]++;
+}
+
+function decrementTaskCount(difficulty) {
+    const key = `tasksCompleted${difficulty.charAt(0).toUpperCase()}${difficulty.slice(1)}`;
+    if (appData.stats[key] > 0) {
+        appData.stats[key]--;
+    }
+}
+
+// ============= HISTORY =============
+
+function renderHistory() {
+    const historyList = document.getElementById('historyList');
+    const historyEmpty = document.getElementById('historyEmpty');
+
+    if (appData.completedHistory.length === 0) {
+        historyEmpty.style.display = 'block';
+        historyList.innerHTML = '';
+        return;
+    }
+
+    historyEmpty.style.display = 'none';
+
+    // Group by date (using 6AM reset logic - before 6AM counts as previous day)
+    const grouped = {};
+    appData.completedHistory.forEach(task => {
+        let date = 'Unknown Date';
+        if (task.completedAt) {
+            const completedDate = new Date(task.completedAt);
+            // If completed before 6AM, count as previous day
+            if (completedDate.getHours() < getResetHourForTimestamp(completedDate)) {
+                completedDate.setDate(completedDate.getDate() - 1);
+            }
+            date = completedDate.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+
+        if (!grouped[date]) {
+            grouped[date] = [];
+        }
+        grouped[date].push(task);
+    });
+
+    // Render grouped history
+    let html = '';
+    for (const [date, tasks] of Object.entries(grouped)) {
+        const totalCoins = tasks.reduce((sum, t) => sum + DIFFICULTIES[t.difficulty].coins, 0);
+        html += `
+            <div class="history-group">
+                <div class="history-date">
+                    <span>${date}</span>
+                    <span class="history-coins">+${totalCoins} coins</span>
+                </div>
+                <div class="history-tasks">
+                    ${tasks.map(task => createHistoryTaskRow(task)).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    historyList.innerHTML = html;
+}
+
+function createHistoryTaskRow(task) {
+    const diff = DIFFICULTIES[task.difficulty];
+    return `
+        <div class="history-task-row">
+            <div class="history-task-check">${diff.emoji}</div>
+            <div class="history-task-title">${escapeHtml(task.title)}</div>
+            <div class="history-task-coins">+${diff.coins}</div>
+        </div>
+    `;
+}
+
+function viewJsonData() {
+    const jsonStr = JSON.stringify(appData, null, 2);
+    // Copy to clipboard
+    navigator.clipboard.writeText(jsonStr).then(() => {
+        alert('JSON data copied to clipboard!\n\nYou can paste it in a text editor to view.');
+    }).catch(() => {
+        // Fallback: show in console
+        console.log('App Data:', appData);
+        alert('JSON data logged to console (press F12 to view).\n\nOr check the saved file in your app data folder.');
+    });
+}
+
+async function deleteTask(id) {
+    const task = appData.tasks.find(t => t.id === id);
+    const taskName = task ? task.title : 'this task';
+    const confirmed = await showDeleteConfirmation(`Are you sure you want to delete "${taskName}"? This cannot be undone.`);
+    if (!confirmed) return;
+
+    appData.tasks = appData.tasks.filter(t => t.id !== id);
+    saveData();
+    renderTasks();
+}
+
+// ============= REWARDS & SHOP =============
+
+// Get the reset date string for 6AM local time
+// Get today's date string for shop reset (uses 6AM logic)
+// Get today's date string for shop reset (uses 6AM logic)
+function getResetDateString() {
+    const now = new Date();
+    if (now.getHours() < getCurrentResetHour()) {
+        now.setDate(now.getDate() - 1);
+    }
+
+    // Use LOCAL time, not ISO (which is UTC)
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+// Check if weekend sale is active (reset-hour Saturday to reset-hour Monday) or on a holiday
+function isWeekendSale() {
+    const now = new Date();
+    
+    // Summer vacation sale: full time everyday until June 1st, 2026
+    if (now < new Date('2026-07-01T00:00:00')) return true;
+
+    const day = now.getDay(); // 0=Sun, 6=Sat
+    const hour = now.getHours();
+    const resetHour = getCurrentResetHour();
+
+    // Saturday after reset hour onwards
+    if (day === 6 && hour >= resetHour) return true;
+    // All of Sunday
+    if (day === 0) return true;
+    // Monday before reset hour
+    if (day === 1 && hour < resetHour) return true;
+
+    // Check for holiday dates (reset-hour to reset-hour next day)
+    const holidays = [
+        '2026-01-19', // MLK Day
+        '2026-03-09', // Spring Break
+        '2026-03-10', // Spring Break
+        '2026-03-11', // Spring Break
+        '2026-03-12', // Spring Break
+        '2026-03-13', // Spring Break
+    ];
+
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    // Check if today is a holiday or vacation day (after reset hour)
+    if ((holidays.includes(dateStr) || isVacationDay(dateStr)) && hour >= resetHour) return true;
+
+    // Check if yesterday was a holiday or vacation day (before reset hour today)
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+    if ((holidays.includes(yesterdayStr) || isVacationDay(yesterdayStr)) && hour < resetHour) return true;
+
+    return false;
+}
+
+// Get current price for a shop item (isDailyShop determines if weekend sale applies)
+function getShopItemPrice(item, isDailyShop = true) {
+    const resetDate = getResetDateString();
+    const purchase = appData.shopPurchases[item.id];
+    const saleActive = isWeekendSale() && isDailyShop;
+    const purchaseCount = (purchase && purchase.lastResetDate === resetDate) ? purchase.count : 0;
+
+    // Determine scaling type and value
+    const scalingType = item.scalingType || 'add';
+    const scaling = item.scaling || 0;
+
+    // Check if there's any increment
+    const hasIncrement = (scalingType === 'multiply' && scaling > 1) ||
+        (scalingType === 'add' && scaling > 0);
+
+    if (!hasIncrement) {
+        // No increment - just base price, 50% off during sale (ceiled)
+        if (saleActive) {
+            return Math.ceil(item.baseCost * 0.5);
+        }
+        return item.baseCost;
+    }
+
+    if (scalingType === 'multiply') {
+        // Multiplicative scaling
+        if (saleActive) {
+            // Sale: half base, sqrt of multiplier
+            const saleBase = Math.ceil(item.baseCost * 0.5);
+            const saleScaling = Math.sqrt(scaling);
+            return Math.ceil(saleBase * Math.pow(saleScaling, purchaseCount));
+        } else {
+            // Normal: baseCost * scaling^count
+            return Math.round(item.baseCost * Math.pow(scaling, purchaseCount));
+        }
+    } else {
+        // Additive scaling
+        if (saleActive) {
+            // Sale: half base (ceiled), increment every 2 purchases
+            const saleBase = Math.ceil(item.baseCost * 0.5);
+            const effectiveCount = Math.floor(purchaseCount / 2);
+            return saleBase + (effectiveCount * scaling);
+        } else {
+            // Normal: baseCost + count * scaling
+            return item.baseCost + (purchaseCount * scaling);
+        }
+    }
+}
+
+// Get time until reset
+function getTimeUntilReset() {
+    const now = new Date();
+
+    // Calculate next reset time
+    let next6AM = new Date(now);
+    next6AM.setHours(getCurrentResetHour(), 0, 0, 0);
+
+    // If it's already past reset hour today, next reset is tomorrow
+    if (now.getHours() >= getCurrentResetHour()) {
+        next6AM.setDate(next6AM.getDate() + 1);
+    }
+
+    const diffMs = next6AM - now;
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    return `${hours}h ${mins}m`;
+}
+
+function renderRewards() {
+    const container = document.getElementById('rewardsGrid');
+    const saleActive = isWeekendSale();
+
+    // Combine preset and custom shop items, filtering out hidden presets
+    const hiddenIds = appData.hiddenShopItems || [];
+    const visiblePresets = SHOP_ITEMS.filter(item => !hiddenIds.includes(item.id));
+    const allShopItems = [...visiblePresets, ...appData.customShopItems];
+
+    // Sale banner HTML
+    const saleBanner = saleActive ? `
+        <div class="sale-banner">
+            <span class="sale-icon"><i data-lucide="party-popper" class="icon icon-orange"></i></span>
+            <span class="sale-text">Weekend Sale - 50% Off!</span>
+            <span class="sale-icon"><i data-lucide="party-popper" class="icon icon-orange"></i></span>
+        </div>
+    ` : '';
+
+    // Build shop items HTML
+    let shopHTML = `
+        <div class="shop-section">
+            ${saleBanner}
+            <div class="shop-header">
+                <h3><i data-lucide="store" class="icon icon-amber" style="width:16px;height:16px;"></i> Daily Shop</h3>
+                <span class="reset-timer">Resets in ${getTimeUntilReset()}</span>
+            </div>
+            <div class="shop-items">
+                ${allShopItems.map(item => createShopItemCard(item, saleActive)).join('')}
+            </div>
+        </div>
+    `;
+
+    // Build custom rewards HTML
+    let rewardsHTML = '';
+    if (appData.rewards.length > 0) {
+        rewardsHTML = `
+            <div class="custom-rewards-section">
+                <h3><i data-lucide="trophy" class="icon icon-gold" style="width:16px;height:16px;"></i> My Rewards</h3>
+                <div class="rewards-list">
+                    ${appData.rewards.map(reward => createRewardCard(reward)).join('')}
+                </div>
+            </div>
+        `;
+    } else {
+        rewardsHTML = `
+            <div class="custom-rewards-section">
+                <h3><i data-lucide="trophy" class="icon icon-gold" style="width:16px;height:16px;"></i> My Rewards</h3>
+                <div class="empty-state small">
+                    <p>Add your own custom rewards!</p>
+                </div>
+            </div>
+        `;
+    }
+
+    container.innerHTML = shopHTML + rewardsHTML;
+
+    // Add event listeners for shop items
+    document.querySelectorAll('.shop-claim-btn.can-claim').forEach(btn => {
+        btn.addEventListener('click', () => openShopClaimModal(btn.dataset.id));
+    });
+
+    // Add event listeners for shop delete (custom items only)
+    document.querySelectorAll('.shop-delete-btn').forEach(btn => {
+        btn.addEventListener('click', () => deleteShopItem(btn.dataset.id));
+    });
+
+    // Add event listeners for custom rewards
+    document.querySelectorAll('.claim-btn.can-claim').forEach(btn => {
+        btn.addEventListener('click', () => openClaimModal(btn.dataset.id));
+    });
+
+    document.querySelectorAll('.reward-delete').forEach(btn => {
+        btn.addEventListener('click', () => deleteReward(btn.dataset.id));
+    });
+
+    // Initialize Lucide icons for dynamically rendered content
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function createShopItemCard(item, saleActive = false) {
+    // Get sale price (isDailyShop = true for daily shop items)
+    const currentPrice = getShopItemPrice(item, true);
+    // Get original price (isDailyShop = false to get non-sale price)
+    const originalPrice = getShopItemPrice(item, false);
+
+    const canAfford = appData.stats.currentBalance >= currentPrice;
+    const resetDate = getResetDateString();
+    const purchase = appData.shopPurchases[item.id];
+    const purchaseCount = (purchase && purchase.lastResetDate === resetDate) ? purchase.count : 0;
+    const isCustom = item.isCustom || false;
+
+    // Build scaling info text
+    const scalingType = item.scalingType || 'add';
+    const scaling = item.scaling || 0;
+    let scalingInfo = '';
+    if (purchaseCount > 0 && scaling > 0) {
+        if (scalingType === 'multiply' && scaling > 1) {
+            scalingInfo = `<span class="price-increase">(×${scaling} each)</span>`;
+        } else if (scalingType === 'add') {
+            scalingInfo = `<span class="price-increase">(+${scaling} each)</span>`;
+        }
+    }
+
+    // Price display with sale styling (show strikethrough if sale is active AND price is different)
+    const showSalePrice = saleActive && originalPrice > currentPrice;
+    const priceDisplay = showSalePrice
+        ? `<span class="original-price">${originalPrice}</span> <span class="sale-price">${currentPrice}</span>`
+        : `<span class="price-amount ${canAfford ? '' : 'too-expensive'}">${currentPrice}</span>`;
+
+    return `
+        <div class="shop-item-card ${canAfford ? '' : 'unaffordable'} ${showSalePrice ? 'on-sale' : ''}" data-id="${item.id}">
+            <div class="shop-item-emoji">${item.emoji}</div>
+            <div class="shop-item-info">
+                <div class="shop-item-name">${escapeHtml(item.name)}</div>
+                <div class="shop-item-price">
+                    <span class="coin-icon"><i data-lucide="circle-dollar-sign" class="icon icon-gold"></i></span>
+                    ${priceDisplay}
+                    ${scalingInfo}
+                </div>
+            </div>
+            <button class="shop-claim-btn ${canAfford ? 'can-claim' : 'cannot-claim'}" data-id="${item.id}" ${!canAfford ? 'disabled' : ''}>
+                ${canAfford ? 'Claim' : `Need ${currentPrice}`}
+            </button>
+            <button class="shop-delete-btn" data-id="${item.id}"><i data-lucide="trash-2" class="icon icon-red"></i></button>
+        </div>
+    `;
+}
+
+function createRewardCard(reward) {
+    const canAfford = appData.stats.currentBalance >= reward.cost;
+    const emoji = CATEGORIES[reward.category] || '<i data-lucide="gift" class="icon icon-gray"></i>';
+
+    return `
+        <div class="reward-card ${canAfford ? '' : 'unaffordable'}" data-id="${reward.id}">
+            <div class="reward-header">
+                <span class="reward-emoji">${emoji}</span>
+                <button class="reward-delete" data-id="${reward.id}"><i data-lucide="trash-2" class="icon icon-red"></i></button>
+            </div>
+            <div class="reward-name">${escapeHtml(reward.name)}</div>
+            ${reward.description ? `<div class="reward-desc">${escapeHtml(reward.description)}</div>` : ''}
+            <div class="reward-footer">
+                <div class="reward-cost">
+                    <span class="coin-icon"><i data-lucide="circle-dollar-sign" class="icon icon-gold"></i></span>
+                    <span>${reward.cost}</span>
+                </div>
+                <button class="claim-btn ${canAfford ? 'can-claim' : 'cannot-claim'}" data-id="${reward.id}" ${!canAfford ? 'disabled' : ''}>
+                    ${canAfford ? 'Claim' : `Need ${reward.cost}`}
+                </button>
+            </div>
+            ${reward.timesClaimed > 0 ? `<div class="reward-claimed">Claimed ${reward.timesClaimed} time${reward.timesClaimed > 1 ? 's' : ''}</div>` : ''}
+        </div>
+    `;
+}
+
+function openAddRewardModal() {
+    document.getElementById('addRewardModal').classList.add('open');
+    document.getElementById('rewardName').value = '';
+    document.getElementById('rewardDesc').value = '';
+    selectCategory(document.querySelector('.cat-btn[data-category="food"]'));
+    selectCost(50);
+
+    // Reset Daily Shop options
+    document.getElementById('addToShopToggle').checked = false;
+    document.getElementById('scalingOptions').style.display = 'none';
+    selectScalingType('add');
+
+    document.getElementById('rewardName').focus();
+}
+
+function closeAddRewardModal() {
+    document.getElementById('addRewardModal').classList.remove('open');
+}
+
+function selectCategory(btn) {
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+}
+
+function selectCost(cost) {
+    document.querySelectorAll('.cost-btn').forEach(b => {
+        b.classList.toggle('selected', parseInt(b.dataset.cost) === cost);
+    });
+    document.getElementById('costSlider').value = cost;
+    document.getElementById('costDisplay').textContent = cost;
+}
+
+// Scaling type selection
+function selectScalingType(type) {
+    document.querySelectorAll('.scaling-btn').forEach(b => b.classList.remove('selected'));
+    document.querySelector(`.scaling-btn[data-type="${type}"]`).classList.add('selected');
+
+    // Update preset labels based on type
+    const presets = document.getElementById('scalingPresets');
+    if (type === 'multiply') {
+        presets.innerHTML = `
+            <button class="scale-preset selected" data-value="2">×2</button>
+            <button class="scale-preset" data-value="3">×3</button>
+            <button class="scale-preset" data-value="4">×4</button>
+            <button class="scale-preset" data-value="5">×5</button>
+        `;
+        selectScaling(2);
+    } else {
+        presets.innerHTML = `
+            <button class="scale-preset" data-value="5">+5</button>
+            <button class="scale-preset selected" data-value="10">+10</button>
+            <button class="scale-preset" data-value="15">+15</button>
+            <button class="scale-preset" data-value="25">+25</button>
+        `;
+        selectScaling(10);
+    }
+
+    // Re-add event listeners
+    document.querySelectorAll('.scale-preset').forEach(btn => {
+        btn.addEventListener('click', () => selectScaling(parseInt(btn.dataset.value)));
+    });
+}
+
+// Scaling amount selection
+function selectScaling(value) {
+    document.querySelectorAll('.scale-preset').forEach(b => {
+        b.classList.toggle('selected', parseInt(b.dataset.value) === value);
+    });
+    document.getElementById('scalingSlider').value = value;
+
+    const scalingType = document.querySelector('.scaling-btn.selected')?.dataset.type || 'add';
+    const prefix = scalingType === 'multiply' ? '×' : '+';
+    document.getElementById('scalingDisplay').textContent = prefix + value;
+}
+
+function saveNewReward() {
+    const name = document.getElementById('rewardName').value.trim();
+    if (!name) return;
+
+    const addToShop = document.getElementById('addToShopToggle').checked;
+    const category = document.querySelector('.cat-btn.selected').dataset.category;
+    const baseCost = parseInt(document.getElementById('costSlider').value);
+
+    if (addToShop) {
+        // Create custom shop item
+        const scalingType = document.querySelector('.scaling-btn.selected')?.dataset.type || 'add';
+        const scaling = parseInt(document.getElementById('scalingSlider').value);
+
+        const shopItem = {
+            id: 'custom_' + Date.now().toString(),
+            name,
+            emoji: CATEGORIES[category] || '<i data-lucide="gift" class="icon icon-gray"></i>',
+            baseCost,
+            scaling,
+            scalingType,
+            isCustom: true,
+            createdAt: new Date().toISOString()
+        };
+
+        appData.customShopItems.push(shopItem);
+    } else {
+        // Create regular reward
+        const reward = {
+            id: Date.now().toString(),
+            name,
+            description: document.getElementById('rewardDesc').value.trim(),
+            category,
+            cost: baseCost,
+            timesClaimed: 0,
+            createdAt: new Date().toISOString()
+        };
+
+        appData.rewards.push(reward);
+    }
+
+    saveData();
+    renderRewards();
+    closeAddRewardModal();
+}
+
+function setupClaimModal(name, cost) {
+    document.getElementById('claimMessage').textContent =
+        `Spend ${cost} coins on "${name}"?\n\nGo enjoy your reward! 🎉`;
+        
+    const duration = parseDuration(name);
+    currentTimerDurationToStart = duration;
+    
+    const timerOpt = document.getElementById('timerOptionContainer');
+    const timerLabel = document.getElementById('startTimerLabelText');
+    const timerCheckbox = document.getElementById('startTimerCheckbox');
+    
+    if (duration > 0) {
+        const mins = Math.round(duration / 60000);
+        timerLabel.textContent = `Start a ${mins} minute timer?`;
+        timerCheckbox.checked = true;
+        timerOpt.style.display = 'block';
+    } else {
+        timerOpt.style.display = 'none';
+        timerCheckbox.checked = false;
+    }
+    
+    document.getElementById('claimModal').classList.add('open');
+}
+
+// Shop item claim modal
+function openShopClaimModal(itemId) {
+    // Find in both preset and custom shop items
+    let item = SHOP_ITEMS.find(i => i.id === itemId);
+    if (!item) {
+        item = appData.customShopItems.find(i => i.id === itemId);
+    }
+    if (!item) return;
+
+    const currentPrice = getShopItemPrice(item);
+    currentShopItemToClaim = { item, price: currentPrice };
+    currentRewardToClaim = null;
+
+    setupClaimModal(item.name, currentPrice);
+}
+
+// Delete shop item (works for both custom and preset items)
+function deleteShopItem(itemId) {
+    // Check if it's a custom item
+    const isCustom = appData.customShopItems.some(i => i.id === itemId);
+
+    if (isCustom) {
+        appData.customShopItems = appData.customShopItems.filter(i => i.id !== itemId);
+    } else {
+        // It's a preset item - add to hidden list
+        if (!appData.hiddenShopItems) appData.hiddenShopItems = [];
+        if (!appData.hiddenShopItems.includes(itemId)) {
+            appData.hiddenShopItems.push(itemId);
+        }
+    }
+
+    saveData();
+    renderRewards();
+}
+
+// Custom reward claim modal
+function openClaimModal(id) {
+    const reward = appData.rewards.find(r => r.id === id);
+    if (!reward) return;
+
+    currentRewardToClaim = reward;
+    currentShopItemToClaim = null;
+    
+    setupClaimModal(reward.name, reward.cost);
+}
+
+function closeClaimModal() {
+    document.getElementById('claimModal').classList.remove('open');
+    currentRewardToClaim = null;
+    currentShopItemToClaim = null;
+}
+
+function confirmClaimReward() {
+    if (currentShopItemToClaim) {
+        // Claiming a shop item
+        const { item, price } = currentShopItemToClaim;
+
+        if (appData.stats.currentBalance < price) {
+            closeClaimModal();
+            return;
+        }
+
+        appData.stats.currentBalance -= price;
+        appData.stats.rewardsClaimed++;
+
+        // Update shop purchase tracking
+        const resetDate = getResetDateString();
+        if (!appData.shopPurchases[item.id] || appData.shopPurchases[item.id].lastResetDate !== resetDate) {
+            appData.shopPurchases[item.id] = { count: 1, lastResetDate: resetDate };
+        } else {
+            appData.shopPurchases[item.id].count++;
+        }
+
+        if (currentTimerDurationToStart > 0 && document.getElementById('startTimerCheckbox').checked) {
+            startRewardTimer(currentTimerDurationToStart);
+        }
+
+        saveData();
+        renderRewards();
+        updateCoinDisplay();
+        closeClaimModal();
+        return;
+    }
+
+    if (currentRewardToClaim) {
+        // Claiming a custom reward
+        appData.stats.currentBalance -= currentRewardToClaim.cost;
+        appData.stats.rewardsClaimed++;
+        currentRewardToClaim.timesClaimed++;
+        currentRewardToClaim.lastClaimedAt = new Date().toISOString();
+
+        if (currentTimerDurationToStart > 0 && document.getElementById('startTimerCheckbox').checked) {
+            startRewardTimer(currentTimerDurationToStart);
+        }
+
+        saveData();
+        renderRewards();
+        updateCoinDisplay();
+        closeClaimModal();
+    }
+}
+
+function deleteReward(id) {
+    appData.rewards = appData.rewards.filter(r => r.id !== id);
+    saveData();
+    renderRewards();
+}
+
+// ============= STATS =============
+
+function renderStats() {
+    const stats = appData.stats;
+
+    // Main stats
+    document.getElementById('statTotalEarned').textContent = stats.totalCoinsEarned;
+    document.getElementById('statBalance').textContent = stats.currentBalance;
+
+    const totalTasks = stats.tasksCompletedQuick + stats.tasksCompletedEasy +
+        stats.tasksCompletedMedium + stats.tasksCompletedHard + stats.tasksCompletedEpic;
+    document.getElementById('statTasksDone').textContent = totalTasks;
+
+    // Difficulty breakdown
+    const diffStats = document.getElementById('difficultyStats');
+    diffStats.innerHTML = Object.entries(DIFFICULTIES).map(([key, diff]) => {
+        const count = stats[`tasksCompleted${key.charAt(0).toUpperCase()}${key.slice(1)}`] || 0;
+        const total = count * diff.coins;
+        return `
+            <div class="diff-stat-row">
+                <span class="emoji">${diff.emoji}</span>
+                <span class="name">${diff.name}</span>
+                <span class="count">${count}</span>
+                <span class="calc">× ${diff.coins}</span>
+                <span class="total">= ${total}</span>
+            </div>
+        `;
+    }).join('');
+
+    // Rewards claimed
+    document.getElementById('statRewardsClaimed').textContent = stats.rewardsClaimed;
+}
+
+// ============= PROGRESS =============
+
+// Current progress view state
+let progressState = {
+    type: 'recurring', // 'recurring' or 'nonrecurring'
+    range: 'daily' // 'daily', 'weekly', 'monthly'
+};
+
+function renderProgress() {
+    // Get current filter states from UI
+    const activeTab = document.querySelector('.progress-tab.active');
+    const activeFilter = document.querySelector('.time-filter.active');
+
+    progressState.type = activeTab ? activeTab.dataset.type : 'recurring';
+    progressState.range = activeFilter ? activeFilter.dataset.range : 'daily';
+
+    const chartContainer = document.getElementById('progressChart');
+    const summaryContainer = document.getElementById('progressSummary');
+
+    // Handle Non-recurring (Coming Soon)
+    if (progressState.type === 'nonrecurring') {
+        chartContainer.innerHTML = `
+            <div class="coming-soon">
+                <span class="coming-soon-icon">🚀</span>
+                <h3>Coming Soon</h3>
+                <p>Non-recurring task analytics are on the way!</p>
+            </div>
+        `;
+        summaryContainer.innerHTML = '';
+        return;
+    }
+
+    // Calculate recurring consistency data
+    const data = calculateRecurringConsistency(progressState.range);
+
+    if (data.length === 0) {
+        chartContainer.innerHTML = `
+            <div class="chart-empty">
+                <span class="chart-empty-icon"><i data-lucide="bar-chart-3" class="icon icon-gray" style="width:40px;height:40px;"></i></span>
+                <p>No data yet. Complete some recurring tasks!</p>
+            </div>
+        `;
+        summaryContainer.innerHTML = '';
+        return;
+    }
+
+    // Render bar chart
+    const chartHTML = renderBarChart(data);
+    chartContainer.innerHTML = chartHTML;
+
+    // Render summary - simple average of displayed bar percentages (excluding vacation days)
+    const nonVacationData = data.filter(d => !d.isVacation);
+    const avgRate = nonVacationData.length > 0 ? Math.round(nonVacationData.reduce((sum, d) => sum + d.rate, 0) / nonVacationData.length) : 0;
+    const avgClass = avgRate >= 80 ? 'good' : avgRate >= 50 ? 'okay' : 'poor';
+    const bestItem = nonVacationData.length > 0 ? nonVacationData.reduce((best, d) => d.rate > best.rate ? d : best, nonVacationData[0]) : (data[0] || {label: 'None', rate: 0});
+    const periodLabel = progressState.range === 'daily' ? 'Day' :
+        progressState.range === 'weekly' ? 'Week' :
+            progressState.range === 'monthly' ? 'Month' : 'Year';
+
+    summaryContainer.innerHTML = `
+        <div class="summary-card">
+            <div class="summary-value ${avgClass}">${avgRate}%</div>
+            <div class="summary-label">Average Consistency</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-value">${bestItem.label}</div>
+            <div class="summary-label">Best ${periodLabel}</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-value">${appData.recurringTasks.filter(t => !t.deleted).length}</div>
+            <div class="summary-label">Recurring Tasks</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-value streak-value">${calculateRecurringStreak()} <i data-lucide="flame" class="icon icon-orange" style="width:24px;height:24px;"></i></div>
+            <div class="summary-label">Current Streak</div>
+        </div>
+    `;
+
+    // Initialize Lucide icons for dynamically rendered content
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    // Render streak history leaderboard
+    const streakHistoryContainer = document.getElementById('streakHistory');
+    if (streakHistoryContainer && progressState.type === 'recurring') {
+        const allStreaks = getAllStreaks();
+        const currentStreak = calculateRecurringStreak();
+
+        if (allStreaks.length > 0) {
+            // Sort by length descending, take top 3
+            allStreaks.sort((a, b) => b.length - a.length);
+            const top3 = allStreaks.slice(0, 3);
+            const maxLen = top3[0].length;
+
+            const rankColors = ['icon-gold', 'icon-gray', 'icon-orange'];
+            const rows = top3.map((s, i) => {
+                const isCurrent = s.isCurrent;
+                const barWidth = maxLen > 0 ? Math.max(8, (s.length / maxLen) * 100) : 8;
+                const dateRange = `${formatShortDate(s.startDate)} – ${formatShortDate(s.endDate)}`;
+
+                return `
+                    <div class="streak-row ${isCurrent ? 'current' : ''}">
+                        <div class="streak-rank"><i data-lucide="award" class="icon ${rankColors[i] || 'icon-gray'}" style="width:20px;height:20px;"></i></div>
+                        <div class="streak-bar-area">
+                            <div class="streak-bar ${isCurrent ? 'active' : ''}" style="width: ${barWidth}%">
+                                <span class="streak-length">${s.length} day${s.length !== 1 ? 's' : ''}</span>
+                            </div>
+                            <div class="streak-dates">${dateRange}${isCurrent ? ' <span class="streak-active-badge">ACTIVE</span>' : ''}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            streakHistoryContainer.innerHTML = `
+                <div class="streak-leaderboard">
+                    <div class="streak-leaderboard-title">
+                        <i data-lucide="trophy" class="icon icon-gold" style="width:20px;height:20px;"></i>
+                        Streak History
+                    </div>
+                    ${rows}
+                </div>
+            `;
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        } else {
+            streakHistoryContainer.innerHTML = '';
+        }
+    } else if (streakHistoryContainer) {
+        streakHistoryContainer.innerHTML = '';
+    }
+}
+
+// Check if a given date string (YYYY-MM-DD) is a vacation day
+function isVacationDay(dateStr) {
+    return (appData.vacationDays || []).includes(dateStr);
+}
+
+// Get all historical streaks (consecutive 100% days)
+function getAllStreaks() {
+    const recurringTasks = appData.recurringTasks || [];
+    if (recurringTasks.length === 0) return [];
+
+    const recurringHistory = (appData.completedHistory || []).filter(t => t.isRecurring);
+    const firstUse = getFirstUseDate();
+    const now = new Date();
+    const todayDate = new Date();
+    if (todayDate.getHours() < getCurrentResetHour()) todayDate.setDate(todayDate.getDate() - 1);
+
+    const totalDays = daysBetweenDates(firstUse, now) + 1;
+    const streaks = [];
+    let currentStreakStart = null;
+    let currentStreakLen = 0;
+
+    for (let i = totalDays - 1; i >= 0; i--) {
+        const date = new Date(todayDate);
+        date.setDate(date.getDate() - i);
+        const dateStr = getDateString(date);
+
+        const activeOnDay = recurringTasks.filter(t => isTaskActiveOnDate(t, date));
+        if (activeOnDay.length === 0) continue; // skip days with no tasks
+
+        const activeIds = activeOnDay.map(t => t.id);
+        const completedOnDay = new Set();
+        recurringHistory.forEach(h => {
+            if (h.completedAt && h.recurringId) {
+                const hDate = new Date(h.completedAt);
+                if (hDate.getHours() < getResetHourForTimestamp(hDate)) hDate.setDate(hDate.getDate() - 1);
+                if (getDateString(hDate) === dateStr && activeIds.includes(h.recurringId)) {
+                    completedOnDay.add(h.recurringId);
+                }
+            }
+        });
+
+        // Vacation days are no-count: skip entirely (don't add to streak, don't break it)
+        if (isVacationDay(dateStr)) continue;
+
+        const allDone = completedOnDay.size >= activeOnDay.length;
+
+        if (allDone) {
+            if (!currentStreakStart) currentStreakStart = new Date(date);
+            currentStreakLen++;
+        } else {
+            if (currentStreakLen > 0) {
+                const endDate = new Date(date);
+                endDate.setDate(endDate.getDate() - 1);
+                streaks.push({
+                    length: currentStreakLen,
+                    startDate: currentStreakStart,
+                    endDate: endDate,
+                    isCurrent: false
+                });
+            }
+            currentStreakStart = null;
+            currentStreakLen = 0;
+        }
+    }
+
+    // Close final streak (may be the current active one)
+    if (currentStreakLen > 0) {
+        const endDate = new Date(todayDate);
+        const isCurrent = getDateString(endDate) === getDateString(todayDate) ||
+            getDateString(new Date(todayDate.getTime() - 86400000)) === getDateString(endDate);
+        streaks.push({
+            length: currentStreakLen,
+            startDate: currentStreakStart,
+            endDate: endDate,
+            isCurrent: true
+        });
+    }
+
+    return streaks;
+}
+
+function formatShortDate(date) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${months[date.getMonth()]} ${date.getDate()}`;
+}
+
+function renderBarChart(data) {
+    const maxHeight = 140; // pixels
+    const barsHTML = data.map(d => {
+        const roundedRate = Math.round(d.rate);
+        const height = Math.max(4, (d.rate / 100) * maxHeight);
+        // Vacation days get a special blue bar; others use normal color tiers
+        const colorClass = d.isVacation ? 'vacation' : (d.rate >= 80 ? 'high' : d.rate >= 50 ? 'medium' : 'low');
+
+        // Build tooltip content if completedIds exists (daily view)
+        let tooltipHTML = '';
+        if (d.isVacation) {
+            tooltipHTML = `<div class="bar-tooltip"><div class="tooltip-task vacation-tip">🏖️ Vacation Day</div></div>`;
+        } else if (d.completedIds && d.activeTaskIds) {
+            // Only show tasks that were scheduled for this day
+            const activeTasks = appData.recurringTasks.filter(t => d.activeTaskIds.includes(t.id));
+            if (activeTasks.length === 0) {
+                tooltipHTML = `<div class="bar-tooltip"><div class="tooltip-task">No tasks scheduled</div></div>`;
+            } else {
+                const taskList = activeTasks.map(task => {
+                    const isCompleted = d.completedIds.includes(task.id);
+                    const icon = isCompleted ? '✓' : '✗';
+                    const className = isCompleted ? 'completed' : 'missed';
+                    return `<div class="tooltip-task ${className}"><span class="tooltip-icon">${icon}</span>${escapeHtml(task.title)}</div>`;
+                }).join('');
+                tooltipHTML = `<div class="bar-tooltip">${taskList}</div>`;
+            }
+        }
+
+        return `
+            <div class="chart-bar" ${(d.completedIds || d.isVacation) ? 'data-has-tooltip="true"' : ''}>
+                <div class="bar-value">${d.isVacation ? '🏖️' : roundedRate + '%'}</div>
+                <div class="bar-fill-container">
+                    <div class="bar-fill ${colorClass}" style="height: ${height}px;"></div>
+                </div>
+                <div class="bar-label">${d.label}</div>
+                ${tooltipHTML}
+            </div>
+        `;
+    }).join('');
+
+    return `<div class="chart-bars">${barsHTML}</div>`;
+}
+
+function getFirstUseDate() {
+    // Find the earliest date in completedHistory
+    let earliest = null;
+    appData.completedHistory.forEach(t => {
+        if (t.completedAt) {
+            const date = new Date(t.completedAt);
+            if (!earliest || date < earliest) {
+                earliest = date;
+            }
+        }
+    });
+    // Also check recurringTasks creation dates
+    appData.recurringTasks.forEach(t => {
+        if (t.createdAt) {
+            const date = new Date(t.createdAt);
+            if (!earliest || date < earliest) {
+                earliest = date;
+            }
+        }
+    });
+    return earliest || new Date();
+}
+
+// Check if a task is explicitly suspended on a given date
+function isTaskSuspendedOnDate(task, date) {
+    if (!task.suspensions || task.suspensions.length === 0) return false;
+    
+    const checkDate = new Date(date);
+    checkDate.setHours(0, 0, 0, 0);
+
+    for (const sus of task.suspensions) {
+        const start = new Date(sus.start);
+        start.setHours(0, 0, 0, 0);
+        
+        let end = null;
+        if (sus.end) {
+            end = new Date(sus.end);
+            end.setHours(23, 59, 59, 999);
+        }
+        
+        if (checkDate >= start && (!end || checkDate <= end)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Check if a recurring task was scheduled to be active on a given date
+function isTaskActiveOnDate(task, date) {
+    const checkDate = new Date(date);
+    checkDate.setHours(0, 0, 0, 0);
+
+    // Task didn't exist yet on this date
+    if (task.createdAt) {
+        const createdDate = new Date(task.createdAt);
+        if (createdDate.getHours() < getResetHourForTimestamp(createdDate)) createdDate.setDate(createdDate.getDate() - 1);
+        createdDate.setHours(0, 0, 0, 0);
+        if (checkDate < createdDate) {
+            return false;
+        }
+    }
+
+    // Task was soft-deleted: not active on or after deletion date
+    if (task.deletedAt) {
+        const deletedDate = new Date(task.deletedAt);
+        if (deletedDate.getHours() < getResetHourForTimestamp(deletedDate)) deletedDate.setDate(deletedDate.getDate() - 1);
+        deletedDate.setHours(0, 0, 0, 0);
+        if (checkDate >= deletedDate) {
+            return false;
+        }
+    }
+
+    // Task is suspended: not active during suspension period
+    if (isTaskSuspendedOnDate(task, checkDate)) {
+        return false;
+    }
+
+    // Daily tasks are always active (if they existed)
+    if (task.type === 'daily' || !task.type) {
+        return true;
+    }
+
+    // Interval tasks: check if date falls on active or break day
+    if (task.type === 'interval' && task.cycleStartDate) {
+        const cycleStart = new Date(task.cycleStartDate);
+
+        // DST-safe day calculation using UTC
+        const daysDiff = daysBetweenDates(cycleStart, checkDate);
+        if (daysDiff < 0) return false; // Before cycle started
+
+        const cycleLength = task.activeDays + task.breakDays;
+        const dayInCycle = daysDiff % cycleLength;
+
+        // Active if we're within the active portion of the cycle
+        return dayInCycle < task.activeDays;
+    }
+
+    return true;
+}
+
+// Calculate the current recurring task streak (consecutive days at 100%)
+function calculateRecurringStreak() {
+    const recurringTasks = appData.recurringTasks || [];
+    if (recurringTasks.length === 0) return 0;
+
+    const recurringHistory = (appData.completedHistory || []).filter(t => t.isRecurring);
+    const today = getTodayDateString();
+    let streak = 0;
+
+    // Check today first: are ALL active (non-deleted) recurring tasks completed?
+    const todayDate = new Date();
+    if (todayDate.getHours() < getCurrentResetHour()) todayDate.setDate(todayDate.getDate() - 1);
+    const activeTodayTasks = recurringTasks.filter(t => !t.deleted && isTaskActiveOnDate(t, todayDate));
+
+    // Today is a vacation day: skip it (don't count, don't break)
+    if (!isVacationDay(getTodayDateString())) {
+        if (activeTodayTasks.length > 0) {
+            const allCompletedToday = activeTodayTasks.every(t => isRecurringCompletedToday(t.id));
+            if (allCompletedToday) {
+                streak = 1;
+            }
+        }
+    }
+
+    // Walk backwards from yesterday, checking each day
+    for (let i = 1; i <= 365; i++) {
+        const date = new Date(todayDate);
+        date.setDate(date.getDate() - i);
+        const dateStr = getDateString(date);
+
+        // Get tasks that were active on this day
+        const activeOnDay = recurringTasks.filter(t => isTaskActiveOnDate(t, date));
+        if (activeOnDay.length === 0) continue; // No tasks scheduled, skip (don't break streak)
+
+        const activeIds = activeOnDay.map(t => t.id);
+
+        // Find which of those were completed
+        const completedOnDay = new Set();
+        recurringHistory.forEach(h => {
+            if (h.completedAt && h.recurringId) {
+                const hDate = new Date(h.completedAt);
+                if (hDate.getHours() < getResetHourForTimestamp(hDate)) hDate.setDate(hDate.getDate() - 1);
+                if (getDateString(hDate) === dateStr && activeIds.includes(h.recurringId)) {
+                    completedOnDay.add(h.recurringId);
+                }
+            }
+        });
+
+        // Vacation days are no-count: skip entirely (don't add to streak, don't break it)
+        if (isVacationDay(dateStr)) continue;
+
+        // Were ALL active tasks completed?
+        if (completedOnDay.size >= activeOnDay.length) {
+            streak++;
+        } else {
+            break; // Streak broken
+        }
+    }
+
+    return streak;
+}
+
+// Show custom delete confirmation modal (returns a Promise)
+function showDeleteConfirmation(message) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('deleteModal');
+        const messageEl = document.getElementById('deleteMessage');
+        const confirmBtn = document.getElementById('confirmDelete');
+        const cancelBtn = document.getElementById('cancelDelete');
+        const closeBtn = document.getElementById('closeDeleteModal');
+
+        messageEl.textContent = message;
+        modal.classList.add('open');
+
+        // Re-render Lucide icons in modal
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        function cleanup(result) {
+            modal.classList.remove('open');
+            confirmBtn.removeEventListener('click', onConfirm);
+            cancelBtn.removeEventListener('click', onCancel);
+            closeBtn.removeEventListener('click', onCancel);
+            resolve(result);
+        }
+
+        function onConfirm() { cleanup(true); }
+        function onCancel() { cleanup(false); }
+
+        confirmBtn.addEventListener('click', onConfirm);
+        cancelBtn.addEventListener('click', onCancel);
+        closeBtn.addEventListener('click', onCancel);
+    });
+}
+
+function calculateRecurringConsistency(range) {
+    const data = [];
+    const now = new Date();
+    const totalRecurring = appData.recurringTasks.length;
+    const firstUse = getFirstUseDate();
+
+    if (totalRecurring === 0) return [];
+
+    // Get all recurring completions from history
+    const recurringHistory = appData.completedHistory.filter(t => t.isRecurring);
+
+    if (range === 'daily') {
+        // Last 7 days (or since first use, whichever is shorter)
+        const daysSinceFirstUse = daysBetweenDates(firstUse, now);
+        const daysToShow = Math.min(7, daysSinceFirstUse + 1);
+
+        for (let i = daysToShow - 1; i >= 0; i--) {
+            const date = new Date(now);
+            date.setDate(date.getDate() - i);
+            const dateStr = getDateString(date);
+
+            // Get tasks that were ACTIVE on this day
+            const activeTasksOnDay = appData.recurringTasks.filter(task => isTaskActiveOnDate(task, date));
+            const activeTaskIds = activeTasksOnDay.map(t => t.id);
+
+            const completedOnDay = new Set();
+            recurringHistory.forEach(t => {
+                if (t.completedAt) {
+                    const tDate = new Date(t.completedAt);
+                    if (tDate.getHours() < getResetHourForTimestamp(tDate)) tDate.setDate(tDate.getDate() - 1);
+                    if (getDateString(tDate) === dateStr && t.recurringId) {
+                        // Only count if this task was active on this day
+                        if (activeTaskIds.includes(t.recurringId)) {
+                            completedOnDay.add(t.recurringId);
+                        }
+                    }
+                }
+            });
+
+            // Calculate rate based on tasks that were SUPPOSED to be done
+            const tasksExpected = activeTasksOnDay.length;
+
+            // Skip days with no tasks scheduled (don't inflate average)
+            if (tasksExpected === 0) continue;
+
+            // Vacation days always show 100%
+            const rate = isVacationDay(dateStr) ? 100 : (completedOnDay.size / tasksExpected) * 100;
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            data.push({
+                label: i === 0 ? 'Today' : i === 1 ? 'Yest' : dayNames[date.getDay()],
+                rate: rate,
+                count: isVacationDay(dateStr) ? tasksExpected : completedOnDay.size,
+                expected: tasksExpected,
+                completedIds: isVacationDay(dateStr) ? activeTaskIds : Array.from(completedOnDay),
+                activeTaskIds: activeTaskIds,
+                isVacation: isVacationDay(dateStr)
+            });
+        }
+    } else if (range === 'weekly') {
+        // Last 4 weeks
+        for (let w = 3; w >= 0; w--) {
+            const weekStart = new Date(now);
+            weekStart.setDate(weekStart.getDate() - (w * 7) - weekStart.getDay());
+
+            let dailyRates = [];
+
+            for (let d = 0; d < 7; d++) {
+                const date = new Date(weekStart);
+                date.setDate(date.getDate() + d);
+                if (date < firstUse || date > now) continue;
+                const dateStr = getDateString(date);
+
+                // Get tasks that were ACTIVE on this day
+                const activeTasksOnDay = appData.recurringTasks.filter(task => isTaskActiveOnDate(task, date));
+                if (activeTasksOnDay.length === 0 || isVacationDay(dateStr)) continue;
+
+                const activeTaskIds = activeTasksOnDay.map(t => t.id);
+
+                const completedOnDay = new Set();
+                recurringHistory.forEach(t => {
+                    if (t.completedAt) {
+                        const tDate = new Date(t.completedAt);
+                        if (tDate.getHours() < getResetHourForTimestamp(tDate)) tDate.setDate(tDate.getDate() - 1);
+                        if (getDateString(tDate) === dateStr && t.recurringId) {
+                            if (activeTaskIds.includes(t.recurringId)) {
+                                completedOnDay.add(t.recurringId);
+                            }
+                        }
+                    }
+                });
+
+                // Calculate this day's rate
+                dailyRates.push((completedOnDay.size / activeTasksOnDay.length) * 100);
+            }
+
+            if (dailyRates.length === 0) continue;
+            // Average of daily rates (consistent with how daily view works)
+            const rate = dailyRates.reduce((sum, r) => sum + r, 0) / dailyRates.length;
+            data.push({
+                label: w === 0 ? 'This Week' : w === 1 ? 'Last Week' : `${w}w ago`,
+                rate: rate,
+                daysCount: dailyRates.length
+            });
+        }
+    } else if (range === 'monthly') {
+        // Last 6 months
+        for (let m = 5; m >= 0; m--) {
+            const monthDate = new Date(now.getFullYear(), now.getMonth() - m, 1);
+            const monthEnd = new Date(now.getFullYear(), now.getMonth() - m + 1, 0);
+
+            // Skip months before first use
+            if (monthEnd < firstUse) continue;
+
+            const daysInMonth = monthEnd.getDate();
+            let dailyRates = [];
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const date = new Date(monthDate.getFullYear(), monthDate.getMonth(), d);
+                if (date < firstUse || date > now) continue;
+                const dateStr = getDateString(date);
+
+                // Get tasks that were ACTIVE on this day
+                const activeTasksOnDay = appData.recurringTasks.filter(task => isTaskActiveOnDate(task, date));
+                if (activeTasksOnDay.length === 0 || isVacationDay(dateStr)) continue;
+
+                const activeTaskIds = activeTasksOnDay.map(t => t.id);
+
+                const completedOnDay = new Set();
+                recurringHistory.forEach(t => {
+                    if (t.completedAt) {
+                        const tDate = new Date(t.completedAt);
+                        if (tDate.getHours() < getResetHourForTimestamp(tDate)) tDate.setDate(tDate.getDate() - 1);
+                        if (getDateString(tDate) === dateStr && t.recurringId) {
+                            if (activeTaskIds.includes(t.recurringId)) {
+                                completedOnDay.add(t.recurringId);
+                            }
+                        }
+                    }
+                });
+
+                // Calculate this day's rate
+                dailyRates.push((completedOnDay.size / activeTasksOnDay.length) * 100);
+            }
+
+            if (dailyRates.length === 0) continue;
+            // Average of daily rates (consistent with how daily view works)
+            const rate = dailyRates.reduce((sum, r) => sum + r, 0) / dailyRates.length;
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            data.push({
+                label: monthNames[monthDate.getMonth()],
+                rate: rate,
+                daysCount: dailyRates.length
+            });
+        }
+    } else if (range === 'yearly') {
+        // Show years since first use (up to 3 years back)
+        const currentYear = now.getFullYear();
+        const firstYear = firstUse.getFullYear();
+
+        for (let y = Math.max(firstYear, currentYear - 2); y <= currentYear; y++) {
+            let dailyRates = [];
+
+            for (let m = 0; m < 12; m++) {
+                const monthEnd = new Date(y, m + 1, 0);
+                const daysInMonth = monthEnd.getDate();
+
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const date = new Date(y, m, d);
+                    if (date < firstUse || date > now) continue;
+                    const dateStr = getDateString(date);
+
+                    // Get tasks that were ACTIVE on this day
+                    const activeTasksOnDay = appData.recurringTasks.filter(task => isTaskActiveOnDate(task, date));
+                    if (activeTasksOnDay.length === 0 || isVacationDay(dateStr)) continue;
+
+                    const activeTaskIds = activeTasksOnDay.map(t => t.id);
+
+                    const completedOnDay = new Set();
+                    recurringHistory.forEach(t => {
+                        if (t.completedAt) {
+                            const tDate = new Date(t.completedAt);
+                            if (tDate.getHours() < getResetHourForTimestamp(tDate)) tDate.setDate(tDate.getDate() - 1);
+                            if (getDateString(tDate) === dateStr && t.recurringId) {
+                                if (activeTaskIds.includes(t.recurringId)) {
+                                    completedOnDay.add(t.recurringId);
+                                }
+                            }
+                        }
+                    });
+
+                    // Calculate this day's rate
+                    dailyRates.push((completedOnDay.size / activeTasksOnDay.length) * 100);
+                }
+            }
+
+            if (dailyRates.length === 0) continue;
+            // Average of daily rates (consistent with how daily view works)
+            const rate = dailyRates.reduce((sum, r) => sum + r, 0) / dailyRates.length;
+            data.push({
+                label: y.toString(),
+                rate: rate,
+                daysCount: dailyRates.length
+            });
+        }
+    }
+
+    return data;
+}
+
+function getDateString(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+// ============= UTILITIES =============
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Start the app
+init();
+
+// One-time backfill for Jan 31st 2026 missing tasks
+async function runBackfillJan31() {
+    const FIX_ID = 'backfill_jan31_v1';
+    if (localStorage.getItem(FIX_ID)) return;
+
+    console.log('Running backfill for Jan 31st...');
+
+    // Date: Jan 31st 2026 (approx 11pm)
+    const backfillDate = new Date('2026-01-31T23:00:00');
+    const backfillDateStr = getDateString(backfillDate);
+
+    let modifications = 0;
+    const tasksToFind = [
+        { id: 'brush_night', exactId: true },
+        { id: 'floss', exactId: true },
+        { title: 'Job Applications', exactId: false }
+    ];
+
+    tasksToFind.forEach(target => {
+        // Find the task
+        let task;
+        if (target.exactId) {
+            task = appData.recurringTasks.find(t => t.id === target.id);
+        } else {
+            task = appData.recurringTasks.find(t => t.title && t.title.toLowerCase().includes(target.title.toLowerCase()));
+        }
+
+        if (task) {
+            // Check if already completed on that day
+            const alreadyDone = appData.completedHistory.some(h => {
+                if (!h.completedAt) return false;
+                const d = new Date(h.completedAt);
+                // Adjust for 6am day start if needed, but simple date string check usually enough for this specific request
+                if (d.getHours() < getResetHourForTimestamp(d)) d.setDate(d.getDate() - 1);
+                return getDateString(d) === backfillDateStr && h.recurringId === task.id;
+            });
+
+            if (!alreadyDone) {
+                const diff = DIFFICULTIES[task.difficulty] || DIFFICULTIES['medium'];
+
+                // Add to history
+                appData.completedHistory.push({
+                    id: Date.now() + Math.random().toString(), // unique ID
+                    title: task.title,
+                    difficulty: task.difficulty,
+                    coins: diff.coins,
+                    completedAt: backfillDate.toISOString(),
+                    isRecurring: true,
+                    recurringId: task.id
+                });
+
+                // Add coins
+                appData.stats.totalCoinsEarned += diff.coins;
+                appData.stats.currentBalance += diff.coins;
+
+                // Update stats
+                const diffKey = `tasksCompleted${task.difficulty.charAt(0).toUpperCase() + task.difficulty.slice(1)}`;
+                if (appData.stats[diffKey] !== undefined) {
+                    appData.stats[diffKey]++;
+                }
+
+                modifications++;
+                console.log(`Backfilled: ${task.title}`);
+            } else {
+                console.log(`Skipped (already done): ${task.title}`);
+            }
+        } else {
+            console.log(`Task not found: ${target.id || target.title}`);
+        }
+    });
+
+    if (modifications > 0) {
+        await saveData();
+        alert(`Backfilled ${modifications} tasks for Jan 31st. +Coins added!`);
+    }
+
+    localStorage.setItem(FIX_ID, 'true');
+}
+
+// Expose subtask functions globally for inline onclick handlers
+window.toggleSubtasks = toggleSubtasks;
+window.toggleSubtask = toggleSubtask;
+
+// ==================== REWARD TIMER LOGIC ====================
+
+function parseDuration(title) {
+    if (!title) return 0;
+    const match = title.match(/(\d+)\s*(min|minute|m|hour|hr|h)s?\b/i);
+    if (!match) return 0;
+    
+    const value = parseInt(match[1]);
+    const unit = match[2].toLowerCase();
+    
+    if (unit.startsWith('h')) {
+        return value * 60 * 60 * 1000;
+    } else {
+        return value * 60 * 1000;
+    }
+}
+
+function initRewardTimer() {
+    const savedState = localStorage.getItem('brownbookRewardTimer');
+    if (savedState) {
+        try {
+            const state = JSON.parse(savedState);
+            if (state.isRunning || state.isPaused) {
+                rewardTimerRemaining = state.remaining;
+                isRewardTimerPaused = state.isPaused;
+                if (!isRewardTimerPaused) {
+                    const elapsed = Date.now() - state.lastUpdated;
+                    rewardTimerRemaining -= elapsed;
+                }
+                
+                if (rewardTimerRemaining > 0) {
+                    resumeRewardTimerCore(false); // false means don't play sound yet
+                } else {
+                    rewardTimerRemaining = 0;
+                    startRinging();
+                }
+            }
+        } catch (e) {
+            console.error('Failed to parse timer state', e);
+        }
+    }
+    
+    document.getElementById('timerPlayPauseBtn').addEventListener('click', () => {
+        if (isRewardTimerPaused || document.getElementById('floatingTimer').classList.contains('ringing')) {
+            // If it was ringing, pause stops the ringing but doesn't resume timer if at 0
+            if (rewardTimerRemaining <= 0) {
+                stopRewardTimer();
+            } else {
+                resumeRewardTimerCore(true);
+            }
+        }
+        else pauseRewardTimer();
+    });
+    
+    document.getElementById('timerStopBtn').addEventListener('click', stopRewardTimer);
+}
+
+function startRewardTimer(durationMs) {
+    stopRewardTimer();
+    rewardTimerRemaining = durationMs;
+    isRewardTimerPaused = false;
+    resumeRewardTimerCore(true);
+}
+
+function resumeRewardTimerCore(updateState = true) {
+    isRewardTimerPaused = false;
+    document.getElementById('floatingTimer').style.display = 'flex';
+    document.getElementById('timerPlayPauseBtn').innerHTML = '<i data-lucide="pause" class="icon" style="width: 16px; height: 16px;"></i>';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    
+    rewardTimerEndTime = Date.now() + rewardTimerRemaining;
+    
+    if (rewardTimerInterval) clearInterval(rewardTimerInterval);
+    rewardTimerInterval = setInterval(timerTick, 1000);
+    timerTick();
+    if (updateState) saveTimerState();
+}
+
+function pauseRewardTimer() {
+    isRewardTimerPaused = true;
+    if (rewardTimerInterval) clearInterval(rewardTimerInterval);
+    
+    document.getElementById('timerPlayPauseBtn').innerHTML = '<i data-lucide="play" class="icon" style="width: 16px; height: 16px; fill: currentColor;"></i>';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    
+    saveTimerState();
+}
+
+function stopRewardTimer() {
+    if (rewardTimerInterval) clearInterval(rewardTimerInterval);
+    if (beepInterval) clearInterval(beepInterval);
+    
+    rewardTimerInterval = null;
+    beepInterval = null;
+    isRewardTimerPaused = false;
+    rewardTimerRemaining = 0;
+    
+    const container = document.getElementById('floatingTimer');
+    container.style.display = 'none';
+    container.classList.remove('ringing');
+    
+    localStorage.removeItem('brownbookRewardTimer');
+}
+
+function timerTick() {
+    if (isRewardTimerPaused) return;
+    
+    rewardTimerRemaining = rewardTimerEndTime - Date.now();
+    
+    if (rewardTimerRemaining <= 0) {
+        rewardTimerRemaining = 0;
+        if (rewardTimerInterval) clearInterval(rewardTimerInterval);
+        startRinging();
+    }
+    
+    updateTimerDisplay();
+    saveTimerState();
+}
+
+function updateTimerDisplay() {
+    const totalSeconds = Math.ceil(rewardTimerRemaining / 1000);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    document.getElementById('timerDisplay').textContent = 
+        `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+function saveTimerState() {
+    if (rewardTimerRemaining <= 0 && !document.getElementById('floatingTimer').classList.contains('ringing')) {
+        localStorage.removeItem('brownbookRewardTimer');
+        return;
+    }
+    
+    localStorage.setItem('brownbookRewardTimer', JSON.stringify({
+        remaining: rewardTimerRemaining,
+        isPaused: isRewardTimerPaused,
+        isRunning: rewardTimerRemaining > 0,
+        lastUpdated: Date.now()
+    }));
+}
+
+function startRinging() {
+    updateTimerDisplay();
+    const container = document.getElementById('floatingTimer');
+    container.style.display = 'flex';
+    container.classList.add('ringing');
+    
+    // Change pause button to a "stop/dismiss" icon, but we already have a stop button.
+    // Let's just make play/pause into a play icon so they know it's stopped.
+    document.getElementById('timerPlayPauseBtn').innerHTML = '<i data-lucide="play" class="icon" style="width: 16px; height: 16px; fill: currentColor;"></i>';
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    
+    if (beepInterval) clearInterval(beepInterval);
+    playBeepSound(); // Play first beep immediately
+    beepInterval = setInterval(playBeepSound, 1000); // Beep every second
+}
+
+function playBeepSound() {
+    try {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        
+        // Resume if suspended (browser policy)
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5 note
+
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(1.0, audioContext.currentTime + 0.05);
+        gainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + 0.3);
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.3);
+    } catch (e) {
+        console.error("Audio beep failed", e);
+    }
+}
+
+// Initialize on load
+document.addEventListener('DOMContentLoaded', initRewardTimer);
