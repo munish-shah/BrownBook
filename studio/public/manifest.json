@@ -1,0 +1,13 @@
+{
+    "name": "BrownBook",
+    "short_name": "BrownBook",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#1d2022",
+    "theme_color": "#100d0b",
+    "description": "Gamified task tracker",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+    ]
+}
