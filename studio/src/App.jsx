@@ -147,7 +147,7 @@ export default function App() {
                 <section key={view} className="view">
                     {view === 'today' && <Today data={data} act={act} openComposer={() => setComposer(true)} setDialog={setDialog} />}
                     {view === 'vault' && <Vault data={data} act={act} openComposer={() => setRewardComposer(true)} setDialog={setDialog} />}
-                    {view === 'pulse' && <Suspense fallback={<div className="view-loading"><span /></div>}><Pulse data={data} /></Suspense>}
+                    {view === 'pulse' && <Suspense fallback={<div className="view-loading"><span /></div>}><Pulse data={data} act={act} /></Suspense>}
                     {view === 'log' && <Log data={data} act={act} bytes={bytes} />}
                 </section>
             </main>

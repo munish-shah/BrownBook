@@ -12,7 +12,7 @@ const LABEL_COLUMN = 34;
 const tier = rate => (rate >= 80 ? 'high' : rate >= 50 ? 'medium' : 'low');
 const shortDate = date => date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
-export default function Pulse({ data }) {
+export default function Pulse({ data, act }) {
     const dayKey = domain.todayKey();
     const [range, setRange] = useState(() => {
         try { return localStorage.getItem('brownbook-pulse-range') || 'daily'; } catch { return 'daily'; }
@@ -86,7 +86,7 @@ export default function Pulse({ data }) {
                         {detail && (
                             <div className="heat-detail">
                                 <b>{detail.title}</b>
-                                <span>{detail.vacation ? 'Vacation day — protected' : detail.tasks ? `${detail.completed}/${detail.expected} rituals` : `${Math.round(detail.rate)}% over ${detail.days} day${detail.days === 1 ? '' : 's'}`}</span>
+                                <span>{detail.vacation ? (detail.tasks ? 'Vacation day — protected' : 'Vacation — nothing was expected, so it counts as 100%') : detail.tasks ? `${detail.completed}/${detail.expected} rituals` : `${Math.round(detail.rate)}% over ${detail.days} day${detail.days === 1 ? '' : 's'}${detail.vacationDays ? ` · ${detail.vacationDays} vacation day${detail.vacationDays === 1 ? '' : 's'} not counted` : ''}`}</span>
                                 {detail.tasks && !detail.vacation && <div>{detail.tasks.map(task => <i key={task.id} className={task.done ? 'yes' : 'no'}>{task.title}</i>)}</div>}
                             </div>
                         )}
@@ -110,7 +110,7 @@ export default function Pulse({ data }) {
                 )}
             </section>
 
-            <Heatmap data={data} />
+            <Heatmap data={data} act={act} />
 
             <section className="bars-panel">
                 <header className="totals">
@@ -158,7 +158,7 @@ const HeatCell = memo(function HeatCell({ cell, today, picked, onHover, onPick }
 });
 
 /** Fixed-size square cells; the number of weeks adapts to the available width. */
-function Heatmap({ data }) {
+function Heatmap({ data, act }) {
     const wrapRef = useRef(null);
     const [weeks, setWeeks] = useState(26);
     const dayKey = domain.todayKey();
@@ -222,6 +222,9 @@ function Heatmap({ data }) {
                     <b>{detail.date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</b>
                     <span>{detail.vacation ? 'Vacation — protected' : detail.expected ? `${detail.completed}/${detail.expected} rituals` : 'Nothing scheduled'}</span>
                     {!detail.vacation && detail.tasks.length > 0 && <div>{detail.tasks.map(task => <i key={task.id} className={task.done ? 'yes' : 'no'}>{task.title}</i>)}</div>}
+                    <button className="vacation-toggle" onClick={() => act(draft => domain.toggleVacation(draft, detail.key), added => (added ? `${detail.key} marked as vacation` : `${detail.key} is a normal day again`), { undo: true })}>
+                        {detail.vacation ? 'Remove vacation' : 'Mark as vacation'}
+                    </button>
                 </div>
             )}
         </section>

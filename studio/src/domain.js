@@ -85,6 +85,14 @@ export function isActiveOn(task, date) {
     return true;
 }
 
+export function toggleVacation(data, key) {
+    const days = new Set(data.vacationDays || []);
+    const added = !days.has(key);
+    if (added) days.add(key); else days.delete(key);
+    data.vacationDays = [...days].sort();
+    return added;
+}
+
 export function isVacation(data, key) {
     return (data.vacationDays || []).includes(key);
 }
@@ -146,7 +154,8 @@ export function deriveToday(data, now = new Date()) {
         open: open.filter(task => !pinned.has(task.id)),
         completedToday,
         suspended,
-        percent: planned ? Math.min(100, Math.round((done / planned) * 100)) : 0,
+        // A vacation day needs nothing done, so the ring reads full.
+        percent: isVacation(data, today) ? 100 : planned ? Math.min(100, Math.round((done / planned) * 100)) : 0,
         remaining: routinesOpen.length + open.length,
         vacation: isVacation(data, today)
     };
@@ -220,14 +229,22 @@ function dayRecord(data, date, index) {
 
 const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+/**
+ * Average consistency over a date range. Vacation days are left out entirely (they neither help nor hurt).
+ * A range made only of vacation days counts as 100%, flagged `vacation`, since nothing was expected.
+ */
 function averageOver(data, index, from, to, floor) {
     const rates = [];
+    let vacationDays = 0;
     for (let date = new Date(from); date <= to; date.setDate(date.getDate() + 1)) {
         if (date < floor) continue;
         const record = dayRecord(data, new Date(date), index);
-        if (record.rate !== null && !record.vacation) rates.push(record.rate);
+        if (record.vacation) vacationDays += 1;
+        else if (record.rate !== null) rates.push(record.rate);
     }
-    return rates.length ? { rate: (rates.reduce((sum, value) => sum + value, 0) / rates.length) * 100, days: rates.length } : null;
+    if (rates.length) return { rate: (rates.reduce((sum, value) => sum + value, 0) / rates.length) * 100, days: rates.length, vacationDays };
+    if (vacationDays) return { rate: 100, days: 0, vacationDays, vacation: true };
+    return null;
 }
 
 /** Consistency per day/week/month/year, mirroring the original Progress view. */
@@ -267,7 +284,9 @@ export function periodSeries(data, range, now = new Date()) {
                 label: back === 0 ? 'This week' : start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
                 title: `Week of ${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`,
                 rate: result.rate,
-                days: result.days
+                days: result.days,
+                vacation: Boolean(result.vacation),
+                vacationDays: result.vacationDays
             });
         }
     } else if (range === 'monthly') {
@@ -280,14 +299,16 @@ export function periodSeries(data, range, now = new Date()) {
                 label: start.toLocaleDateString(undefined, { month: 'short' }),
                 title: start.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
                 rate: result.rate,
-                days: result.days
+                days: result.days,
+                vacation: Boolean(result.vacation),
+                vacationDays: result.vacationDays
             });
         }
     } else {
         for (let year = Math.max(first.getFullYear(), today.getFullYear() - 2); year <= today.getFullYear(); year += 1) {
             const result = averageOver(data, index, new Date(year, 0, 1), new Date(year, 11, 31) < today ? new Date(year, 11, 31) : today, first);
             if (!result) continue;
-            series.push({ label: String(year), title: String(year), rate: result.rate, days: result.days });
+            series.push({ label: String(year), title: String(year), rate: result.rate, days: result.days, vacation: Boolean(result.vacation), vacationDays: result.vacationDays });
         }
     }
     return series;

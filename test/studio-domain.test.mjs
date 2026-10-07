@@ -131,3 +131,32 @@ test('pausing and resuming a ritual works, including before the 6 AM reset', asy
     assert.equal(isSuspendedOn(routine, taskDay(wednesday)), false);
     assert.equal(isSuspendedOn(routine, taskDay(new Date(2026, 9, 6, 10))), true);
 });
+
+test('vacation days never add zeros, and an all-vacation period counts as 100%', async () => {
+    const { periodSeries } = await import('../studio/src/domain.js');
+    const data = normalizeAppData(createPreviewData());
+    const now = new Date(2026, 9, 7, 12);
+    // Mark the whole of last week (Mon Sep 28 - Sun Oct 4) as vacation.
+    data.vacationDays = ['2026-09-28', '2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04'];
+    const weekly = periodSeries(data, 'weekly', now);
+    const vacationWeek = weekly.find(point => point.title === 'Week of Sep 28');
+    assert.ok(vacationWeek, 'the vacation week is still listed');
+    assert.equal(vacationWeek.vacation, true);
+    assert.equal(vacationWeek.rate, 100);
+
+    // A week with some vacation days averages only the non-vacation days.
+    data.vacationDays = ['2026-10-05'];
+    const mixed = periodSeries(data, 'weekly', now).find(point => point.title === 'Week of Oct 5');
+    assert.equal(mixed.vacation, false);
+    assert.equal(mixed.vacationDays, 1);
+    assert.ok(mixed.rate >= 0 && mixed.rate <= 100);
+});
+
+test('vacation days can be added and removed', async () => {
+    const { toggleVacation, isVacation } = await import('../studio/src/domain.js');
+    const data = normalizeAppData(createPreviewData());
+    assert.equal(toggleVacation(data, '2026-09-27'), true);
+    assert.equal(isVacation(data, '2026-09-27'), true);
+    assert.equal(toggleVacation(data, '2026-09-27'), false);
+    assert.equal(isVacation(data, '2026-09-27'), false);
+});

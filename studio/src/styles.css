@@ -326,6 +326,8 @@ button.cell.today:hover, button.cell.today.picked { box-shadow: inset 0 0 0 2px 
 .legend-gap { width: 10px; }
 .heat-detail { display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; gap: 6px 12px; min-height: 52px; margin-top: 16px; font-size: 13px; }
 .heat-detail span { color: var(--muted); }
+.vacation-toggle { margin-left: auto; padding: 5px 10px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: none; font-size: 12px; font-weight: 600; transition: color .2s, background .2s; }
+.vacation-toggle:hover { color: var(--ink); background: var(--soft); }
 .heat-detail div { display: flex; flex-wrap: wrap; gap: 6px; }
 .heat-detail i { padding: 3px 8px; border-radius: 999px; font-style: normal; font-size: 12px; }
 .heat-detail .yes { color: var(--bg); background: var(--accent); }
