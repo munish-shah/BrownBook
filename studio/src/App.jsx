@@ -1,18 +1,20 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, LayoutGroup, MotionConfig, motion } from 'motion/react';
 import { Toaster, toast } from 'sonner';
-import { Calendar, CloudSlash, Command as CommandIcon, Coins, Gift, Lightning, Plus, Tray } from '@phosphor-icons/react';
+import { Calendar, CloudSlash, Command as CommandIcon, Coins, Gift, Lightning, Plus, Target, Tray } from '@phosphor-icons/react';
 import { DOC_LIMIT_BYTES, useBrownBook } from './store.js';
 import { THEMES, applyTheme } from './themes.js';
 import * as domain from './domain.js';
 import { AnimatedNumber, spring } from './components/ui.jsx';
 import { RewardComposer, TaskComposer } from './components/Composers.jsx';
 import { Dialog } from './components/Dialogs.jsx';
+import { GoalComposer } from './components/GoalSheets.jsx';
 import { RewardTimer } from './components/RewardTimer.jsx';
 import { Logo } from './components/Logo.jsx';
 import Today from './views/Today.jsx';
 import Vault from './views/Vault.jsx';
 import Log from './views/Log.jsx';
+import Goals from './views/Goals.jsx';
 
 const Pulse = lazy(() => import('./views/Pulse.jsx'));
 const CommandPalette = lazy(() => import('./components/CommandPalette.jsx'));
@@ -20,8 +22,9 @@ const CommandPalette = lazy(() => import('./components/CommandPalette.jsx'));
 const VIEWS = [
     { id: 'today', label: 'Today', icon: Lightning, key: '1' },
     { id: 'vault', label: 'Vault', icon: Gift, key: '2' },
-    { id: 'pulse', label: 'Pulse', icon: Calendar, key: '3' },
-    { id: 'log', label: 'Log', icon: Tray, key: '4' }
+    { id: 'goals', label: 'Goals', icon: Target, key: '3' },
+    { id: 'pulse', label: 'Pulse', icon: Calendar, key: '4' },
+    { id: 'log', label: 'Log', icon: Tray, key: '5' }
 ];
 
 const SYNC_LABEL = { synced: 'Saved', saving: 'Saving…', connecting: 'Connecting…', offline: 'Offline', preview: 'Preview' };
@@ -36,6 +39,7 @@ export default function App() {
     const [paletteLoaded, setPaletteLoaded] = useState(false);
     const [composer, setComposer] = useState(false);
     const [rewardComposer, setRewardComposer] = useState(false);
+    const [goalComposer, setGoalComposer] = useState(null);
     const [dialog, setDialog] = useState(null);
     const [theme, setTheme] = useState(localStorage.getItem('brownbook-theme') || 'default');
     const [tick, setTick] = useState(0);
@@ -147,6 +151,7 @@ export default function App() {
                 <section key={view} className="view">
                     {view === 'today' && <Today data={data} act={act} openComposer={() => setComposer(true)} setDialog={setDialog} />}
                     {view === 'vault' && <Vault data={data} act={act} openComposer={() => setRewardComposer(true)} setDialog={setDialog} />}
+                    {view === 'goals' && <Goals data={data} act={act} setDialog={setDialog} openComposer={preset => setGoalComposer({ preset: preset || null })} />}
                     {view === 'pulse' && <Suspense fallback={<div className="view-loading"><span /></div>}><Pulse data={data} act={act} /></Suspense>}
                     {view === 'log' && <Log data={data} act={act} bytes={bytes} />}
                 </section>
@@ -164,6 +169,7 @@ export default function App() {
                         changeTheme={changeTheme}
                         openComposer={() => setComposer(true)}
                         openRewardComposer={() => setRewardComposer(true)}
+                        openGoalComposer={() => { setView('goals'); setGoalComposer({ preset: null }); }}
                         setDialog={setDialog}
                         act={act}
                     />
@@ -172,6 +178,7 @@ export default function App() {
             <AnimatePresence>
                 {composer && <TaskComposer key="task" onClose={() => setComposer(false)} act={act} />}
                 {rewardComposer && <RewardComposer key="reward" onClose={() => setRewardComposer(false)} act={act} />}
+                {goalComposer && <GoalComposer key="goal" preset={goalComposer.preset} data={data} onClose={() => setGoalComposer(null)} act={act} />}
                 {dialog && <Dialog key={`${dialog.type}-${dialog.id || ''}`} dialog={dialog} data={data} onClose={closeDialog} act={act} setDialog={setDialog} />}
             </AnimatePresence>
             <RewardTimer />

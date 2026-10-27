@@ -60,7 +60,7 @@ test('today derivation separates focus, routines, and tasks', () => {
     const today = deriveToday(data, morning);
     assert.ok(today.focus.some(task => task.id === 'preview-task-1'));
     assert.equal(today.open.some(task => task.id === 'preview-task-1'), false);
-    completeTask(data, 'preview-task-2');
+    completeTask(data, 'preview-task-2', morning);
     assert.equal(deriveToday(data, morning).completedToday.length >= 1, true);
 });
 

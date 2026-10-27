@@ -5,6 +5,7 @@ import { PREVIEW, getSecretKey } from '../store.js';
 import * as domain from '../domain.js';
 import { Sheet } from './ui.jsx';
 import { Subtasks } from './Subtasks.jsx';
+import { GoalDetail, GoalLogDialog } from './GoalSheets.jsx';
 
 export function Dialog({ dialog, data, onClose, act, setDialog }) {
     switch (dialog.type) {
@@ -13,6 +14,8 @@ export function Dialog({ dialog, data, onClose, act, setDialog }) {
         case 'key': return <KeyDialog onClose={onClose} />;
         case 'import': return <ImportDialog onClose={onClose} act={act} />;
         case 'detail': return <DetailDialog dialog={dialog} data={data} onClose={onClose} act={act} setDialog={setDialog} />;
+        case 'goal-log': return <GoalLogDialog dialog={dialog} data={data} onClose={onClose} act={act} />;
+        case 'goal-detail': return <GoalDetail dialog={dialog} data={data} onClose={onClose} act={act} />;
         default: return null;
     }
 }

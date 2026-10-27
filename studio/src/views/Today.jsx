@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowCounterClockwise, CaretDown, Check, CheckCircle, Pause, PencilSimple, Plus, PushPin, PushPinSlash, Repeat, Sparkle, Trash, Tray } from '@phosphor-icons/react';
+import { ArrowCounterClockwise, CaretDown, Check, Target, CheckCircle, Pause, PencilSimple, Plus, PushPin, PushPinSlash, Repeat, Sparkle, Trash, Tray } from '@phosphor-icons/react';
 import * as domain from '../domain.js';
 import { Ring, formatLeft } from '../components/ui.jsx';
 import { Subtasks } from '../components/Subtasks.jsx';
+import { runRoutine } from '../components/routines.js';
 
 const isRoutineId = (data, id) => data.recurringTasks.some(task => task.id === id);
 
@@ -27,9 +28,9 @@ export default function Today({ data, act, openComposer, setDialog }) {
     const greeting = hour < 6 ? 'Late night' : hour < 12 ? 'Morning' : hour < 18 ? 'Afternoon' : 'Evening';
 
     const complete = task => act(draft => domain.completeTask(draft, task.id), awarded => awarded ? `+${awarded} coins · ${task.title}` : `Cleared ${task.title}`, { undo: true });
-    const routine = task => act(draft => domain.toggleRoutine(draft, task.id), ({ awarded, bonus }) => bonus ? `+${awarded} and +${bonus} early-bird bonus` : awarded ? `+${awarded} · ${task.title}` : `Undid ${task.title}`, { undo: true });
+    const routine = task => runRoutine({ task, data, act, setDialog });
     const pin = task => act(draft => domain.togglePin(draft, task.id));
-    const detail = (task, kind) => setDialog({ type: 'detail', id: task.id, kind });
+    const detail = (task, kind) => setDialog(task.goalId ? { type: 'goal-detail', goalId: task.goalId } : { type: 'detail', id: task.id, kind });
 
     const pinCandidates = [...today.routinesOpen, ...today.open].slice(0, 4);
     const queue = useMemo(() => [...today.open].sort((a, b) => (a.expiresAt ? new Date(a.expiresAt).getTime() : Infinity) - (b.expiresAt ? new Date(b.expiresAt).getTime() : Infinity)), [today.open]);
@@ -96,14 +97,17 @@ export default function Today({ data, act, openComposer, setDialog }) {
                             const done = data.recurringCompletions[task.id] === today.today;
                             const level = domain.DIFFICULTIES[task.difficulty];
                             const steps = task.subtasks.length;
+                            const goal = task.goalId ? data.goals.find(candidate => candidate.id === task.goalId) : null;
+                            const loggedValue = goal && done ? goal.logs[today.today] : undefined;
                             return (
-                                <motion.div layout key={task.id} className={done ? 'orb done' : 'orb'} style={{ '--hue': level.hue }}>
+                                <motion.div layout key={task.id} className={`${done ? 'orb done' : 'orb'}${goal ? ' goal' : ''}`} style={{ '--hue': level.hue }}>
+                                    {goal && <Target className="orb-goal" weight="fill" aria-label="Goal check-in" />}
                                     <motion.button whileTap={{ scale: 0.9 }} className="orb-face" onClick={() => routine(task)} aria-label={`${done ? 'Undo' : 'Complete'} ${task.title}`}>
                                         {done ? <Check weight="bold" /> : <span>{level.coins}</span>}
                                     </motion.button>
                                     <button className="orb-title" onClick={() => detail(task, 'routine')} title="Open details and steps">
                                         <b>{task.title}</b>
-                                        <small>{steps ? `${task.subtasks.filter(step => step.completed).length}/${steps} steps` : task.notes || level.label}</small>
+                                        <small>{loggedValue !== undefined ? `Logged ${loggedValue}${goal.unit ? ` ${goal.unit}` : ''}` : steps ? `${task.subtasks.filter(step => step.completed).length}/${steps} steps` : task.notes || level.label}</small>
                                     </button>
                                     <div className="orb-tools">
                                         <button onClick={() => pin(task)} aria-label={`Pin ${task.title}`} title="Pin to focus"><PushPin /></button>

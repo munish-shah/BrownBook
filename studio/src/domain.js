@@ -93,6 +93,12 @@ export function toggleVacation(data, key) {
     return added;
 }
 
+/** Goal check-ins stay out of Pulse (consistency, streaks, the ring) unless the goal opts in. */
+export function pulseTask(data, task) {
+    if (!task.goalId) return true;
+    return Boolean(data.goals?.find(goal => goal.id === task.goalId)?.countInPulse);
+}
+
 export function isVacation(data, key) {
     return (data.vacationDays || []).includes(key);
 }
@@ -143,8 +149,9 @@ export function deriveToday(data, now = new Date()) {
     const focus = data.focusPinnedIds
         .map(id => open.find(task => task.id === id) || routinesOpen.find(task => task.id === id))
         .filter(Boolean);
-    const planned = scheduled.length + open.filter(task => task.difficulty !== 'placeholder').length + completedToday.length;
-    const done = routinesDone.length + completedToday.length;
+    const counted = scheduled.filter(task => pulseTask(data, task));
+    const planned = counted.length + open.filter(task => task.difficulty !== 'placeholder').length + completedToday.length;
+    const done = routinesDone.filter(task => pulseTask(data, task)).length + completedToday.length;
 
     return {
         today,
@@ -162,7 +169,7 @@ export function deriveToday(data, now = new Date()) {
 }
 
 export function streak(data, now = new Date()) {
-    const live = data.recurringTasks;
+    const live = data.recurringTasks.filter(task => pulseTask(data, task));
     if (!live.length) return 0;
     const index = completionIndex(data);
     const day = taskDay(now);
@@ -213,7 +220,7 @@ export function firstUseDate(data, now = new Date()) {
 
 function dayRecord(data, date, index) {
     const key = dateKey(date);
-    const active = data.recurringTasks.filter(task => isActiveOn(task, date));
+    const active = data.recurringTasks.filter(task => pulseTask(data, task) && isActiveOn(task, date));
     const done = index.get(key) || new Set();
     const completed = active.filter(task => done.has(task.id));
     return {
@@ -249,7 +256,7 @@ function averageOver(data, index, from, to, floor) {
 
 /** Consistency per day/week/month/year, mirroring the original Progress view. */
 export function periodSeries(data, range, now = new Date()) {
-    if (!data.recurringTasks.length) return [];
+    if (!data.recurringTasks.some(task => pulseTask(data, task))) return [];
     const index = completionIndex(data);
     const today = taskDay(now);
     const first = firstUseDate(data, now);
@@ -316,7 +323,7 @@ export function periodSeries(data, range, now = new Date()) {
 
 /** Every streak since first use, newest last. Vacation and unscheduled days neither count nor break. */
 export function allStreaks(data, now = new Date()) {
-    if (!data.recurringTasks.length) return [];
+    if (!data.recurringTasks.some(task => pulseTask(data, task))) return [];
     const index = completionIndex(data);
     const today = taskDay(now);
     const streaks = [];
@@ -341,7 +348,7 @@ export function allStreaks(data, now = new Date()) {
     return streaks;
 }
 
-export function completeTask(data, id) {
+export function completeTask(data, id, now = new Date()) {
     const index = data.tasks.findIndex(task => task.id === id);
     if (index === -1) return 0;
     const task = data.tasks[index];
@@ -353,7 +360,7 @@ export function completeTask(data, id) {
     task.coins = getTaskRewardCoins(task, DIFFICULTY_COINS);
     task.subtasks.forEach(subtask => { subtask.completed = true; });
     task.completed = true;
-    task.completedAt = new Date().toISOString();
+    task.completedAt = now.toISOString();
     addCoins(data, awarded);
     adjustCount(data, task.difficulty, 1);
     data.completedHistory.unshift(task);
@@ -376,7 +383,7 @@ export function reopenTask(data, id) {
 
 function earlyBirdBonus(data, today, now) {
     if (data.stats.lastEarlyBirdBonusDate === today) return 0;
-    const active = data.recurringTasks.filter(task => !task.deleted && isActiveOn(task, taskDay(now)));
+    const active = data.recurringTasks.filter(task => !task.deleted && pulseTask(data, task) && isActiveOn(task, taskDay(now)));
     if (!active.length || !active.every(task => data.recurringCompletions[task.id] === today)) return 0;
     const hour = now.getHours();
     const multiplier = hour >= RESET_HOUR && hour < 21 ? 0.5 : hour === 21 ? 0.25 : 0;
@@ -389,7 +396,19 @@ function earlyBirdBonus(data, today, now) {
     return bonus;
 }
 
-export function toggleRoutine(data, id, now = new Date()) {
+/** Record (or clear, with null) the value a goal check-in produced for a day. */
+function syncGoalLog(data, task, key, value) {
+    const goal = task.goalId ? data.goals?.find(candidate => candidate.id === task.goalId) : null;
+    if (!goal) return;
+    if (value === null) delete goal.logs[key];
+    else goal.logs[key] = value;
+}
+
+/**
+ * Complete or undo a ritual. For a goal check-in, `goalValue` is the amount or measurement to record;
+ * simple hit/miss goals record 1 on their own.
+ */
+export function toggleRoutine(data, id, now = new Date(), goalValue) {
     const task = data.recurringTasks.find(candidate => candidate.id === id);
     if (!task) return { awarded: 0, bonus: 0 };
     const today = todayKey(now);
@@ -407,7 +426,18 @@ export function toggleRoutine(data, id, now = new Date()) {
             data.stats.lastEarlyBirdBonusCoins = 0;
         }
         if (index !== -1) data.completedHistory.splice(index, 1);
+        syncGoalLog(data, task, today, null);
         return { awarded: 0, bonus: 0 };
+    }
+
+    let logValue = null;
+    if (task.goalId) {
+        const goal = data.goals?.find(candidate => candidate.id === task.goalId);
+        if (goal && goal.type === 'habit' && goal.mode === 'check') logValue = 1;
+        else if (goal) {
+            if (goalValue === undefined || goalValue === null || goalValue === '' || !Number.isFinite(Number(goalValue))) throw new Error('Enter a number to complete this check-in.');
+            logValue = Number(goalValue);
+        }
     }
 
     const awarded = getCompletionCoinDelta(task, DIFFICULTY_COINS);
@@ -426,6 +456,7 @@ export function toggleRoutine(data, id, now = new Date()) {
         completed: true,
         completedAt: now.toISOString()
     });
+    if (logValue !== null) syncGoalLog(data, task, today, logValue);
     return { awarded, bonus: earlyBirdBonus(data, today, now) };
 }
 

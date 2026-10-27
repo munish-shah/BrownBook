@@ -33,7 +33,7 @@ export default function Pulse({ data, act }) {
     const average = scored.length ? Math.round(scored.reduce((sum, point) => sum + point.rate, 0) / scored.length) : 0;
     const best = scored.length ? scored.reduce((top, point) => (point.rate > top.rate ? point : top), scored[0]) : null;
     const periodLabel = RANGES.find(item => item[0] === range)[2];
-    const liveRoutines = data.recurringTasks.filter(task => !task.deleted).length;
+    const liveRoutines = data.recurringTasks.filter(task => !task.deleted && domain.pulseTask(data, task)).length;
     const top = useMemo(() => [...streaks].sort((a, b) => b.length - a.length || b.end - a.end).slice(0, 3), [streaks]);
     const active = hovered ?? picked;
     const detail = active !== null && series[active] ? series[active] : series.at(-1);

@@ -69,6 +69,28 @@ function normalizeTask(task) {
     return normalized;
 }
 
+const GOAL_TYPES = new Set(['target', 'habit']);
+
+function normalizeGoal(goal) {
+    const raw = asObject(goal);
+    const logs = Object.fromEntries(
+        Object.entries(asObject(raw.logs)).filter(([, value]) => Number.isFinite(Number(value))).map(([key, value]) => [key, Number(value)])
+    );
+    return {
+        ...raw,
+        id: String(raw.id || crypto.randomUUID()),
+        title: String(raw.title || '').trim(),
+        type: GOAL_TYPES.has(raw.type) ? raw.type : 'habit',
+        unit: String(raw.unit || ''),
+        mode: raw.mode === 'amount' ? 'amount' : 'check',
+        paused: Boolean(raw.paused),
+        archived: Boolean(raw.archived),
+        countInPulse: Boolean(raw.countInPulse),
+        weeklyMin: Math.min(7, Math.max(1, Math.round(asFiniteNumber(raw.weeklyMin, 6)))),
+        logs
+    };
+}
+
 function normalizeReward(reward) {
     return {
         ...asObject(reward),
@@ -102,6 +124,7 @@ export function createDefaultAppData() {
         rewards: [],
         customShopItems: [],
         focusPinnedIds: [],
+        goals: [],
         vacationDays: [...DEFAULT_VACATION_DAYS],
         stats: { ...DEFAULT_STATS },
         shopPurchases: {},
@@ -127,6 +150,7 @@ export function normalizeAppData(rawData) {
         rewards: asArray(raw.rewards).map(normalizeReward).filter(reward => reward.name),
         customShopItems: asArray(raw.customShopItems).map(normalizeShopItem).filter(item => item.name),
         focusPinnedIds: asArray(raw.focusPinnedIds).map(String),
+        goals: asArray(raw.goals).map(normalizeGoal).filter(goal => goal.title),
         vacationDays: Array.isArray(raw.vacationDays)
             ? [...new Set(raw.vacationDays.map(String))]
             : defaults.vacationDays,

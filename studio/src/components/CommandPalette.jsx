@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Command } from 'cmdk';
 import { toast } from 'sonner';
-import { Check, Gift, Key, Palette as PaletteIcon, Plus, PushPin, Repeat, Tray } from '@phosphor-icons/react';
+import { Check, Gift, Key, Palette as PaletteIcon, Plus, PushPin, Repeat, Target, Tray } from '@phosphor-icons/react';
 import { THEMES } from '../themes.js';
 import * as domain from '../domain.js';
 import { exportBackup, spring } from './ui.jsx';
+import { runRoutine } from './routines.js';
 
-export default function CommandPalette({ open, onClose, data, views, setView, theme, changeTheme, openComposer, openRewardComposer, setDialog, act }) {
+export default function CommandPalette({ open, onClose, data, views, setView, theme, changeTheme, openComposer, openRewardComposer, openGoalComposer, setDialog, act }) {
     const [search, setSearch] = useState('');
     const close = () => { setSearch(''); onClose(); };
     const run = fn => () => { fn(); close(); };
@@ -32,6 +33,7 @@ export default function CommandPalette({ open, onClose, data, views, setView, th
                                 <Command.Group heading="Create">
                                     <Command.Item onSelect={run(openComposer)}><Plus />New task<kbd>N</kbd></Command.Item>
                                     <Command.Item onSelect={run(openRewardComposer)}><Gift />New reward</Command.Item>
+                                    <Command.Item onSelect={run(openGoalComposer)}><Target />New goal</Command.Item>
                                 </Command.Group>
                                 {(openTasks.length > 0 || openRituals.length > 0) && (
                                     <Command.Group heading="Complete">
@@ -39,7 +41,7 @@ export default function CommandPalette({ open, onClose, data, views, setView, th
                                             <Command.Item key={task.id} value={`complete ${task.title}`} onSelect={run(() => act(draft => domain.completeTask(draft, task.id), awarded => `+${awarded} · ${task.title}`, { undo: true }))}><Check />{task.title}{data.focusPinnedIds.includes(task.id) && <PushPin weight="fill" />}</Command.Item>
                                         ))}
                                         {openRituals.map(task => (
-                                            <Command.Item key={task.id} value={`ritual ${task.title}`} onSelect={run(() => act(draft => domain.toggleRoutine(draft, task.id), `Done · ${task.title}`, { undo: true }))}><Repeat />{task.title}{data.focusPinnedIds.includes(task.id) && <PushPin weight="fill" />}</Command.Item>
+                                            <Command.Item key={task.id} value={`ritual ${task.title}`} onSelect={run(() => runRoutine({ task, data, act, setDialog }))}><Repeat />{task.title}{data.focusPinnedIds.includes(task.id) && <PushPin weight="fill" />}</Command.Item>
                                         ))}
                                     </Command.Group>
                                 )}
